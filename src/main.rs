@@ -1,19 +1,22 @@
-use nekonet::tensor::{operation::matmul, Tensor};
+use nekonet::{
+    layer::{self, Layer},
+    tensor::{operation::matmul, Tensor},
+};
 
 fn main() {
-    let a = Tensor::new(vec![1., 2., 3., 4., 5., 6.], vec![2, 3]);
-    a.init_grad();
-    let b = Tensor::new(vec![1., 4., 2., 5., 3., 6.], vec![3, 2]);
-    b.init_grad();
+    let x = Tensor::new(vec![1., 2., 3., 4., 5., 6.], vec![2, 3]);
 
-    let c = matmul(a.clone(), b.clone());
-    c.init_grad();
+    let fc1 = layer::Linear::new(3, 2);
+    let y = fc1.input(x.clone());
+    y.all_require_grad(true);
+    x.require_grad(false);
+    y.all_init_grad();
 
-    c.forward();
-    c.set_grad(1.);
-    c.backward().unwrap();
+    y.forward();
 
-    c.dbg();
-    a.dbg();
-    b.dbg();
+    y.set_grad(1.);
+    y.backward().unwrap();
+
+    dbg!(x);
+    dbg!(fc1);
 }

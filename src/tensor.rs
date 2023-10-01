@@ -2,7 +2,7 @@ pub mod operation;
 pub mod tensor_func;
 
 use std::{
-    cell::{Cell, RefCell, RefMut},
+    cell::{Cell, RefCell},
     rc::Rc,
 };
 
@@ -10,9 +10,9 @@ use anyhow::{anyhow, Result};
 
 use self::tensor_func::{Head, TensorFunc};
 
-type Data = Vec<f32>;
-type Shape = Vec<usize>;
-type Grad = Vec<f32>;
+pub type Data = Vec<f32>;
+pub type Shape = Vec<usize>;
+pub type Grad = Vec<f32>;
 
 #[derive(Clone, Debug, Default)]
 pub struct Tensor {
@@ -21,9 +21,9 @@ pub struct Tensor {
 
 pub(crate) struct TensorInner {
     data: RefCell<Data>,
-    shape: Shape,
+    shape: RefCell<Shape>,
     grad: RefCell<Grad>,
-    is_require_grad: Cell<bool>,
+    require_grad: Cell<bool>,
     input: RefCell<Box<dyn TensorFunc>>,
     forwarded: Cell<bool>,
 }
@@ -56,8 +56,8 @@ impl Tensor {
         }
     }
 
-    pub fn shape(&self) -> &Shape {
-        &self.inner.shape
+    pub fn shape(&self) -> Shape {
+        self.inner.shape.borrow().clone()
     }
 
     pub fn data(&self) -> &RefCell<Data> {
@@ -72,8 +72,15 @@ impl Tensor {
         self.inner.require_grad(val);
     }
 
+    pub fn is_require_grad(&self) -> bool {
+        self.inner.is_require_grad()
+    }
+
     pub fn all_require_grad(&self, val: bool) {
-        self.inner.all_require_grad(val);
+        self.require_grad(val);
+        for tensor in self.input_tensors() {
+            tensor.all_require_grad(val);
+        }
     }
 
     pub fn is_forwarded(&self) -> &Cell<bool> {
@@ -84,12 +91,26 @@ impl Tensor {
         self.inner.init_grad();
     }
 
+    pub fn all_init_grad(&self) {
+        if self.is_require_grad() {
+            self.init_grad();
+        }
+        for tensor in self.input_tensors() {
+            tensor.all_init_grad();
+        }
+    }
+
     pub fn set_grad(&self, val: f32) {
         self.inner.set_grad(val);
     }
 
     pub fn dbg(&self) {
         self.inner.dbg();
+        println!("===== input tensors: ======");
+        for tensor in self.input_tensors() {
+            tensor.inner.dbg();
+        }
+        println!("==== end input tensors ====");
     }
 
     pub fn forward(&self) {
@@ -101,7 +122,7 @@ impl Tensor {
     }
 
     pub fn backward(&self) -> Result<()> {
-        if !self.inner.is_require_grad() {
+        if !self.is_require_grad() {
             return Ok(());
         }
 
@@ -126,15 +147,19 @@ impl Tensor {
             tensor.inner.unforwarded();
         }
     }
+
+    pub fn reshape(&self, shape: Shape) -> Result<()> {
+        self.inner.reshape(shape)
+    }
 }
 
 impl Default for TensorInner {
     fn default() -> TensorInner {
         TensorInner {
             data: RefCell::new(Vec::new()),
-            shape: Vec::new(),
+            shape: RefCell::new(Vec::new()),
             grad: RefCell::new(Vec::new()),
-            is_require_grad: Cell::new(false),
+            require_grad: Cell::new(false),
             input: RefCell::new(Box::new(Head::default())),
             forwarded: Cell::new(false),
         }
@@ -146,11 +171,19 @@ impl std::fmt::Debug for TensorInner {
         let data = self.data.borrow();
         let shape = self
             .shape
+            .borrow()
             .iter()
             .map(|x| x.to_string())
             .collect::<Vec<String>>()
             .join("x");
-        write!(f, "Tensor(shape={}, data={:?})", shape, data)
+        write!(
+            f,
+            "Tensor(shape={}, \ndata={:?}, \ngrad={:?}, \nrequire_grad={})",
+            shape,
+            data,
+            self.grad.borrow(),
+            self.is_require_grad()
+        )
     }
 }
 
@@ -159,6 +192,7 @@ impl TensorInner {
         assert_eq!(data.len(), shape.iter().product());
 
         let data = RefCell::new(data);
+        let shape = RefCell::new(shape);
         TensorInner {
             data,
             shape,
@@ -168,9 +202,11 @@ impl TensorInner {
 
     fn from_input<TF: TensorFunc + 'static>(input: TF) -> TensorInner {
         let shape = input.output_shape();
+
         let mut data = Vec::new();
         data.resize(shape.iter().product(), 0.0);
         let data = RefCell::new(data);
+        let shape = RefCell::new(shape);
 
         let input = RefCell::new(Box::new(input) as Box<dyn TensorFunc>);
 
@@ -184,18 +220,11 @@ impl TensorInner {
     }
 
     fn require_grad(&self, val: bool) {
-        self.is_require_grad.set(val);
-    }
-
-    fn all_require_grad(&self, val: bool) {
-        self.is_require_grad.set(val);
-        for tensor in self.input.borrow_mut().tensors() {
-            tensor.inner.require_grad(val);
-        }
+        self.require_grad.set(val);
     }
 
     fn is_require_grad(&self) -> bool {
-        self.is_require_grad.get()
+        self.require_grad.get()
     }
 
     fn init_grad(&self) {
@@ -209,7 +238,7 @@ impl TensorInner {
 
     fn grad(&self) -> Result<&RefCell<Grad>> {
         if self.grad.borrow().len() == 0 {
-            return Err(anyhow!("grad is not initialized"));
+            return Err(anyhow!("grad is not initialized, {:?}", self));
         }
         Ok(&self.grad)
     }
@@ -218,8 +247,20 @@ impl TensorInner {
         self.forwarded.set(false);
     }
 
+    fn reshape(&self, shape: Shape) -> Result<()> {
+        if self.shape.borrow().iter().product::<usize>() != shape.iter().product::<usize>() {
+            return Err(anyhow!(
+                "cannot reshape tensor of shape {:?} to {:?}",
+                self.shape,
+                shape
+            ));
+        }
+
+        *self.shape.borrow_mut() = shape;
+        Ok(())
+    }
+
     fn dbg(&self) {
         dbg!(self);
-        dbg!(self.grad.borrow());
     }
 }

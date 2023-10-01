@@ -7,7 +7,7 @@ use super::{Data, Grad, Shape, Tensor};
 pub(crate) trait TensorFunc {
     fn output_shape(&self) -> Shape;
     fn cal_output_data(&self) -> Data;
-    fn renew_grad(&self, output_grad: &Grad);
+    fn cal_grad(&self, output_grad: &Grad);
     fn tensors(&self) -> Vec<Tensor>;
 
     fn forward_prev(&self) {
@@ -30,9 +30,20 @@ pub(crate) trait TensorFunc {
         output_forwarded.set(true);
     }
     fn backward(&self, output_grad: &Grad) -> Result<()> {
-        self.renew_grad(output_grad);
+        if self.inputs_require_grad().iter().all(|x| !x) {
+            return Ok(());
+        }
+
+        self.cal_grad(output_grad);
         self.backward_prev()?;
         Ok(())
+    }
+    fn inputs_require_grad(&self) -> Vec<bool> {
+        let mut inputs_require_grad = Vec::new();
+        for tensor in self.tensors() {
+            inputs_require_grad.push(tensor.is_require_grad());
+        }
+        inputs_require_grad
     }
 }
 
@@ -46,7 +57,7 @@ impl TensorFunc for Head {
     fn cal_output_data(&self) -> Data {
         panic!("Head should not be called")
     }
-    fn renew_grad(&self, _: &Grad) {
+    fn cal_grad(&self, _: &Grad) {
         panic!("Head should not be called")
     }
     fn forward(&self, _: RefMut<Data>, output_forwarded: &Cell<bool>) {
@@ -148,18 +159,22 @@ impl TensorFunc for Add {
         left.iter().zip(right.iter()).map(|(l, r)| l + r).collect()
     }
 
-    fn renew_grad(&self, output_grad: &Grad) {
-        let mut left_grad = self.0.grad().unwrap().borrow_mut();
-        for i in 0..output_grad.len() {
-            left_grad[i] += output_grad[i];
+    fn cal_grad(&self, output_grad: &Grad) {
+        if self.0.is_require_grad() {
+            let mut left_grad = self.0.grad().unwrap().borrow_mut();
+            for i in 0..output_grad.len() {
+                left_grad[i] += output_grad[i];
+            }
+            drop(left_grad);
         }
-        drop(left_grad);
 
-        let mut right_grad = self.1.grad().unwrap().borrow_mut();
-        for i in 0..output_grad.len() {
-            right_grad[i] += output_grad[i];
+        if self.1.is_require_grad() {
+            let mut right_grad = self.1.grad().unwrap().borrow_mut();
+            for i in 0..output_grad.len() {
+                right_grad[i] += output_grad[i];
+            }
+            drop(right_grad);
         }
-        drop(right_grad);
     }
 
     fn tensors(&self) -> Vec<Tensor> {
@@ -177,7 +192,7 @@ impl TensorFunc for Opposite {
         input.iter().map(|x| -x).collect()
     }
 
-    fn renew_grad(&self, output_grad: &Grad) {
+    fn cal_grad(&self, output_grad: &Grad) {
         let mut input_grad = self.0.grad().unwrap().borrow_mut();
         for i in 0..output_grad.len() {
             input_grad[i] += -output_grad[i];
@@ -200,7 +215,7 @@ impl TensorFunc for Reciprocal {
         input.iter().map(|x| 1.0 / x).collect()
     }
 
-    fn renew_grad(&self, output_grad: &Grad) {
+    fn cal_grad(&self, output_grad: &Grad) {
         let mut input_grad = self.0.grad().unwrap().borrow_mut();
 
         for i in 0..output_grad.len() {
@@ -226,22 +241,26 @@ impl TensorFunc for ScalarMul {
         left.iter().zip(right.iter()).map(|(l, r)| l * r).collect()
     }
 
-    fn renew_grad(&self, output_grad: &Grad) {
-        let mut left_grad = self.0.grad().unwrap().borrow_mut();
-        let right = &self.1.data().borrow();
+    fn cal_grad(&self, output_grad: &Grad) {
+        if self.0.is_require_grad() {
+            let mut left_grad = self.0.grad().unwrap().borrow_mut();
+            let right = &self.1.data().borrow();
 
-        for i in 0..output_grad.len() {
-            left_grad[i] += output_grad[i] * right[i];
+            for i in 0..output_grad.len() {
+                left_grad[i] += output_grad[i] * right[i];
+            }
+            drop(left_grad);
         }
-        drop(left_grad);
 
-        let mut right_grad = self.1.grad().unwrap().borrow_mut();
-        let left = &self.0.data().borrow();
+        if self.1.is_require_grad() {
+            let mut right_grad = self.1.grad().unwrap().borrow_mut();
+            let left = &self.0.data().borrow();
 
-        for i in 0..output_grad.len() {
-            right_grad[i] += output_grad[i] * left[i];
+            for i in 0..output_grad.len() {
+                right_grad[i] += output_grad[i] * left[i];
+            }
+            drop(right_grad);
         }
-        drop(right_grad);
     }
 
     fn tensors(&self) -> Vec<Tensor> {
@@ -263,24 +282,28 @@ impl TensorFunc for Pow {
             .collect()
     }
 
-    fn renew_grad(&self, output_grad: &Grad) {
-        let mut base_grad = self.base.grad().unwrap().borrow_mut();
-        let base = &self.base.data().borrow();
-        let exponent = &self.exponent.data().borrow();
+    fn cal_grad(&self, output_grad: &Grad) {
+        if self.base.is_require_grad() {
+            let mut base_grad = self.base.grad().unwrap().borrow_mut();
+            let base = &self.base.data().borrow();
+            let exponent = &self.exponent.data().borrow();
 
-        for i in 0..output_grad.len() {
-            base_grad[i] += output_grad[i] * exponent[i] * base[i].powf(exponent[i] - 1.0);
+            for i in 0..output_grad.len() {
+                base_grad[i] += output_grad[i] * exponent[i] * base[i].powf(exponent[i] - 1.0);
+            }
+            drop(base_grad);
         }
-        drop(base_grad);
 
-        let mut exponent_grad = self.exponent.grad().unwrap().borrow_mut();
-        let base = &self.base.data().borrow();
-        let exponent = &self.exponent.data().borrow();
+        if self.exponent.is_require_grad() {
+            let mut exponent_grad = self.exponent.grad().unwrap().borrow_mut();
+            let base = &self.base.data().borrow();
+            let exponent = &self.exponent.data().borrow();
 
-        for i in 0..output_grad.len() {
-            exponent_grad[i] += output_grad[i] * base[i].ln() * base[i].powf(exponent[i]);
+            for i in 0..output_grad.len() {
+                exponent_grad[i] += output_grad[i] * base[i].ln() * base[i].powf(exponent[i]);
+            }
+            drop(exponent_grad);
         }
-        drop(exponent_grad);
     }
 
     fn tensors(&self) -> Vec<Tensor> {
@@ -298,7 +321,7 @@ impl TensorFunc for Ln {
         input.iter().map(|x| x.ln()).collect()
     }
 
-    fn renew_grad(&self, output_grad: &Grad) {
+    fn cal_grad(&self, output_grad: &Grad) {
         let mut input_grad = self.0.grad().unwrap().borrow_mut();
         for i in 0..output_grad.len() {
             input_grad[i] += output_grad[i] / self.0.data().borrow()[i];
@@ -325,26 +348,33 @@ impl TensorFunc for MatMul {
         let left_shape = self.0.shape();
         let right_shape = self.1.shape();
 
-        matmul(left, right, left_shape, right_shape)
+        matmul(left, right, &left_shape, &right_shape)
     }
 
-    fn renew_grad(&self, output_grad: &Grad) {
-        let mut left_grad = self.0.grad().unwrap().borrow_mut();
-        let right = &self.1.data().borrow();
+    fn cal_grad(&self, output_grad: &Grad) {
+        if self.0.is_require_grad() {
+            let mut left_grad = self.0.grad().unwrap().borrow_mut();
+            let right = &self.1.data().borrow();
 
-        let left_shape = self.0.shape();
-        let right_shape = self.1.shape();
+            let left_shape = self.0.shape();
+            let right_shape = self.1.shape();
 
-        let (right_t, right_t_shape) = transpose(right, right_shape);
-        *left_grad = matmul(output_grad, &right_t, &self.output_shape(), &right_t_shape);
-        drop(left_grad);
+            let (right_t, right_t_shape) = transpose(right, &right_shape);
+            *left_grad = matmul(output_grad, &right_t, &self.output_shape(), &right_t_shape);
+            drop(left_grad);
+        }
 
-        let mut right_grad = self.1.grad().unwrap().borrow_mut();
-        let left = &self.0.data().borrow();
+        if self.1.is_require_grad() {
+            let mut right_grad = self.1.grad().unwrap().borrow_mut();
+            let left = &self.0.data().borrow();
 
-        let (left_t, left_t_shape) = transpose(left, left_shape);
-        *right_grad = matmul(&left_t, output_grad, &left_t_shape, &self.output_shape());
-        drop(right_grad);
+            let left_shape = self.0.shape();
+            let right_shape = self.1.shape();
+
+            let (left_t, left_t_shape) = transpose(left, &left_shape);
+            *right_grad = matmul(&left_t, output_grad, &left_t_shape, &self.output_shape());
+            drop(right_grad);
+        }
     }
 
     fn tensors(&self) -> Vec<Tensor> {
@@ -380,4 +410,110 @@ fn transpose(data: &Data, shape: &Shape) -> (Data, Shape) {
     }
 
     (output, output_shape)
+}
+
+pub struct Slice {
+    input: Tensor,
+
+    start: usize,
+    end: usize,
+}
+
+impl Slice {
+    pub fn new(tensor: Tensor, start: usize, end: usize) -> Slice {
+        assert!(start < end, "start should be less than end");
+        assert!(
+            end <= tensor.shape().iter().product(),
+            "end should be less than tensor.shape()[0]"
+        );
+        Slice {
+            input: tensor,
+            start,
+            end,
+        }
+    }
+}
+
+impl TensorFunc for Slice {
+    fn output_shape(&self) -> Shape {
+        vec![self.end - self.start]
+    }
+
+    fn cal_output_data(&self) -> Data {
+        let input = &self.input.data().borrow();
+        input[self.start..self.end].to_vec()
+    }
+
+    fn cal_grad(&self, output_grad: &Grad) {
+        let mut input_grad = self.input.grad().unwrap().borrow_mut();
+        for i in 0..output_grad.len() {
+            input_grad[self.start + i] += output_grad[i];
+        }
+        drop(input_grad);
+    }
+
+    fn tensors(&self) -> Vec<Tensor> {
+        vec![self.input.clone()]
+    }
+}
+
+pub struct Concat {
+    inputs: Vec<Tensor>,
+}
+
+impl Concat {
+    pub fn new(inputs: Vec<Tensor>) -> Concat {
+        assert!(inputs.len() > 0, "inputs should not be empty");
+        let shape = inputs[0].shape();
+        for i in 1..inputs.len() {
+            assert_eq!(
+                inputs[i].shape(),
+                shape,
+                "shape mismatch, inputs[0]: {:?}, inputs[{}]: {:?}",
+                shape,
+                i,
+                inputs[i].shape()
+            );
+        }
+        Concat { inputs }
+    }
+}
+
+impl TensorFunc for Concat {
+    fn output_shape(&self) -> Shape {
+        let mut output_shape = self.inputs[0].shape().clone();
+        output_shape[0] = 0;
+        for tensor in &self.inputs {
+            output_shape[0] += tensor.shape()[0];
+        }
+        output_shape
+    }
+
+    fn cal_output_data(&self) -> Data {
+        let mut output = Vec::new();
+        for tensor in &self.inputs {
+            output.extend_from_slice(&tensor.data().borrow());
+        }
+        output
+    }
+
+    fn cal_grad(&self, output_grad: &Grad) {
+        let mut start = 0;
+        for tensor in &self.inputs {
+            if !tensor.is_require_grad() {
+                start += tensor.shape()[0];
+                continue;
+            }
+            let mut input_grad = tensor.grad().unwrap().borrow_mut();
+            for i in 0..tensor.shape()[1] {
+                input_grad[i] += output_grad[start + i];
+            }
+            start += tensor.shape()[0];
+            drop(input_grad);
+        }
+    }
+
+    fn tensors(&self) -> Vec<Tensor> {
+        self.inputs.clone()
+    }
 }
