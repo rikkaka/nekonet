@@ -1,3 +1,5 @@
+pub mod activation;
+pub mod layer;
 pub mod operation;
 pub mod tensor_func;
 
@@ -100,8 +102,8 @@ impl Tensor {
         }
     }
 
-    pub fn set_grad(&self, val: f32) {
-        self.inner.set_grad(val);
+    pub fn set_grad_1(&self) {
+        self.inner.set_grad(1.);
     }
 
     pub fn dbg(&self) {
@@ -129,7 +131,7 @@ impl Tensor {
         self.inner
             .input
             .borrow_mut()
-            .backward(&self.grad()?.borrow())?;
+            .backward(&self.data().borrow(), &self.grad()?.borrow())?;
         Ok(())
     }
 

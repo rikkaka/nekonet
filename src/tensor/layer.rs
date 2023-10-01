@@ -1,29 +1,16 @@
 use crate::tensor::{
     operation::{add, concat, matmul, split_rows},
-    tensor_func::TensorFunc,
-    Shape, Tensor,
+    Tensor,
 };
+
+pub trait Layer {
+    fn output(&self, input: Tensor) -> Tensor;
+}
 
 #[derive(Clone, Debug)]
 pub struct Linear {
     weight: Tensor,
     bias: Tensor,
-}
-
-pub struct ReLU {
-    previous: Tensor,
-}
-
-pub struct Sigmoid {
-    previous: Tensor,
-}
-
-pub struct Softmax {
-    previous: Tensor,
-}
-
-pub trait Layer {
-    fn input(&self, input: Tensor) -> Tensor;
 }
 
 impl Linear {
@@ -44,7 +31,7 @@ impl Linear {
 }
 
 impl Layer for Linear {
-    fn input(&self, input: Tensor) -> Tensor {
+    fn output(&self, input: Tensor) -> Tensor {
         let output = matmul(input, self.weight.clone());
         let mut output = split_rows(output);
         for i in 0..output.len() {

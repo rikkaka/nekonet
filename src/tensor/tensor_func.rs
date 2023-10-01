@@ -7,7 +7,7 @@ use super::{Data, Grad, Shape, Tensor};
 pub(crate) trait TensorFunc {
     fn output_shape(&self) -> Shape;
     fn cal_output_data(&self) -> Data;
-    fn cal_grad(&self, output_grad: &Grad);
+    fn cal_grad(&self, output_data: &Data, output_grad: &Grad);
     fn tensors(&self) -> Vec<Tensor>;
 
     fn forward_prev(&self) {
@@ -29,12 +29,12 @@ pub(crate) trait TensorFunc {
         *output_data = self.cal_output_data();
         output_forwarded.set(true);
     }
-    fn backward(&self, output_grad: &Grad) -> Result<()> {
+    fn backward(&self, output_data: &Data, output_grad: &Grad) -> Result<()> {
         if self.inputs_require_grad().iter().all(|x| !x) {
             return Ok(());
         }
 
-        self.cal_grad(output_grad);
+        self.cal_grad(output_data, output_grad);
         self.backward_prev()?;
         Ok(())
     }
@@ -57,13 +57,13 @@ impl TensorFunc for Head {
     fn cal_output_data(&self) -> Data {
         panic!("Head should not be called")
     }
-    fn cal_grad(&self, _: &Grad) {
+    fn cal_grad(&self, _: &Data, _: &Grad) {
         panic!("Head should not be called")
     }
     fn forward(&self, _: RefMut<Data>, output_forwarded: &Cell<bool>) {
         output_forwarded.set(true);
     }
-    fn backward(&self, _: &Grad) -> Result<()> {
+    fn backward(&self, _: &Data, _: &Grad) -> Result<()> {
         Ok(())
     }
     fn tensors(&self) -> Vec<Tensor> {
@@ -159,7 +159,7 @@ impl TensorFunc for Add {
         left.iter().zip(right.iter()).map(|(l, r)| l + r).collect()
     }
 
-    fn cal_grad(&self, output_grad: &Grad) {
+    fn cal_grad(&self, _output_data: &Data, output_grad: &Grad) {
         if self.0.is_require_grad() {
             let mut left_grad = self.0.grad().unwrap().borrow_mut();
             for i in 0..output_grad.len() {
@@ -192,7 +192,7 @@ impl TensorFunc for Opposite {
         input.iter().map(|x| -x).collect()
     }
 
-    fn cal_grad(&self, output_grad: &Grad) {
+    fn cal_grad(&self, _output_data: &Data, output_grad: &Grad) {
         let mut input_grad = self.0.grad().unwrap().borrow_mut();
         for i in 0..output_grad.len() {
             input_grad[i] += -output_grad[i];
@@ -215,7 +215,7 @@ impl TensorFunc for Reciprocal {
         input.iter().map(|x| 1.0 / x).collect()
     }
 
-    fn cal_grad(&self, output_grad: &Grad) {
+    fn cal_grad(&self, _output_data: &Data, output_grad: &Grad) {
         let mut input_grad = self.0.grad().unwrap().borrow_mut();
 
         for i in 0..output_grad.len() {
@@ -241,7 +241,7 @@ impl TensorFunc for ScalarMul {
         left.iter().zip(right.iter()).map(|(l, r)| l * r).collect()
     }
 
-    fn cal_grad(&self, output_grad: &Grad) {
+    fn cal_grad(&self, _output_data: &Data, output_grad: &Grad) {
         if self.0.is_require_grad() {
             let mut left_grad = self.0.grad().unwrap().borrow_mut();
             let right = &self.1.data().borrow();
@@ -282,7 +282,7 @@ impl TensorFunc for Pow {
             .collect()
     }
 
-    fn cal_grad(&self, output_grad: &Grad) {
+    fn cal_grad(&self, _output_data: &Data, output_grad: &Grad) {
         if self.base.is_require_grad() {
             let mut base_grad = self.base.grad().unwrap().borrow_mut();
             let base = &self.base.data().borrow();
@@ -321,7 +321,7 @@ impl TensorFunc for Ln {
         input.iter().map(|x| x.ln()).collect()
     }
 
-    fn cal_grad(&self, output_grad: &Grad) {
+    fn cal_grad(&self, _output_data: &Data, output_grad: &Grad) {
         let mut input_grad = self.0.grad().unwrap().borrow_mut();
         for i in 0..output_grad.len() {
             input_grad[i] += output_grad[i] / self.0.data().borrow()[i];
@@ -348,19 +348,18 @@ impl TensorFunc for MatMul {
         let left_shape = self.0.shape();
         let right_shape = self.1.shape();
 
-        matmul(left, right, &left_shape, &right_shape)
+        matmul(left, &left_shape, right, &right_shape)
     }
 
-    fn cal_grad(&self, output_grad: &Grad) {
+    fn cal_grad(&self, _output_data: &Data, output_grad: &Grad) {
         if self.0.is_require_grad() {
             let mut left_grad = self.0.grad().unwrap().borrow_mut();
             let right = &self.1.data().borrow();
 
-            let left_shape = self.0.shape();
             let right_shape = self.1.shape();
 
             let (right_t, right_t_shape) = transpose(right, &right_shape);
-            *left_grad = matmul(output_grad, &right_t, &self.output_shape(), &right_t_shape);
+            *left_grad = matmul(output_grad, &self.output_shape(), &right_t, &right_t_shape);
             drop(left_grad);
         }
 
@@ -369,10 +368,9 @@ impl TensorFunc for MatMul {
             let left = &self.0.data().borrow();
 
             let left_shape = self.0.shape();
-            let right_shape = self.1.shape();
 
             let (left_t, left_t_shape) = transpose(left, &left_shape);
-            *right_grad = matmul(&left_t, output_grad, &left_t_shape, &self.output_shape());
+            *right_grad = matmul(&left_t, &left_t_shape, output_grad, &self.output_shape());
             drop(right_grad);
         }
     }
@@ -382,7 +380,7 @@ impl TensorFunc for MatMul {
     }
 }
 
-fn matmul(left: &Data, right: &Data, left_shape: &Shape, right_shape: &Shape) -> Data {
+fn matmul(left: &Data, left_shape: &Shape, right: &Data, right_shape: &Shape) -> Data {
     let mut output = Vec::new();
     output.resize(left_shape[0] * right_shape[1], 0.0);
 
@@ -444,7 +442,7 @@ impl TensorFunc for Slice {
         input[self.start..self.end].to_vec()
     }
 
-    fn cal_grad(&self, output_grad: &Grad) {
+    fn cal_grad(&self, _output_data: &Data, output_grad: &Grad) {
         let mut input_grad = self.input.grad().unwrap().borrow_mut();
         for i in 0..output_grad.len() {
             input_grad[self.start + i] += output_grad[i];
@@ -497,7 +495,7 @@ impl TensorFunc for Concat {
         output
     }
 
-    fn cal_grad(&self, output_grad: &Grad) {
+    fn cal_grad(&self, _output_data: &Data, output_grad: &Grad) {
         let mut start = 0;
         for tensor in &self.inputs {
             if !tensor.is_require_grad() {
