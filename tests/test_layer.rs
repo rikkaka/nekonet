@@ -1,7 +1,4 @@
-use nekonet::tensor::{
-    layer::{self, Layer},
-    Tensor,
-};
+use nekonet::{layer, tensor::Tensor};
 
 #[test]
 fn test_linear() {
@@ -15,7 +12,7 @@ fn test_linear() {
 
     y.forward();
 
-    y.set_grad_1();
+    y.one_grad();
     y.backward().unwrap();
 
     assert_eq!(y.shape(), &[2, 2]);

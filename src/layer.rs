@@ -1,10 +1,15 @@
+pub mod activation;
+pub mod criterion;
+
 use crate::tensor::{
     operation::{add, concat, matmul, split_rows},
     Tensor,
 };
 
 pub trait Layer {
-    fn output(&self, input: Tensor) -> Tensor;
+    fn params(&self) -> Vec<Tensor> {
+        Vec::new()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -28,10 +33,8 @@ impl Linear {
     pub fn bias(&self) -> &Tensor {
         &self.bias
     }
-}
 
-impl Layer for Linear {
-    fn output(&self, input: Tensor) -> Tensor {
+    pub fn output(&self, input: Tensor) -> Tensor {
         let output = matmul(input, self.weight.clone());
         let mut output = split_rows(output);
         for i in 0..output.len() {
@@ -40,3 +43,10 @@ impl Layer for Linear {
         concat(output)
     }
 }
+
+impl Layer for Linear {
+    fn params(&self) -> Vec<Tensor> {
+        vec![self.weight.clone(), self.bias.clone()]
+    }
+}
+

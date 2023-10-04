@@ -1,5 +1,7 @@
 use super::{
-    tensor_func::{Add, Concat, Ln, MatMul, Opposite, Pow, Reciprocal, ScalarMul, Slice},
+    tensor_func::basic::{
+        Add, Concat, Ln, MatMul, Mean, Opposite, Pow, Reciprocal, ScalarMul, Slice, Sum,
+    },
     Tensor,
 };
 
@@ -35,11 +37,11 @@ pub fn slice(tensor: Tensor, start: usize, end: usize) -> Tensor {
     Tensor::from_input(Slice::new(tensor, start, end))
 }
 
-pub fn split_row(tensor: Tensor, row: usize) -> Tensor {
-    let shape = tensor.shape();
+pub fn split_row(input: Tensor, row: usize) -> Tensor {
+    let shape = input.shape();
     let start = row * shape[1..].iter().product::<usize>();
     let end = (row + 1) * shape[1..].iter().product::<usize>();
-    let tensor = slice(tensor, start, end);
+    let tensor = slice(input, start, end);
     tensor
         .reshape(
             vec![1]
@@ -62,4 +64,12 @@ pub fn split_rows(tensor: Tensor) -> Vec<Tensor> {
 
 pub fn concat(tensors: Vec<Tensor>) -> Tensor {
     Tensor::from_input(Concat::new(tensors))
+}
+
+pub fn sum(input: Tensor) -> Tensor {
+    Tensor::from_input(Sum::new(input))
+}
+
+pub fn mean(input: Tensor) -> Tensor {
+    Tensor::from_input(Mean::new(input))
 }

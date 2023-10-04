@@ -1,0 +1,59 @@
+use crate::tensor::{operation, tensor_func::compound, Tensor};
+
+pub trait Criterion {
+    fn output(&self, predict: Tensor, target: Tensor) -> Tensor;
+}
+
+pub struct CrossEntropyLoss {
+    reduction: Reduction,
+}
+
+impl CrossEntropyLoss {
+    pub fn new() -> CrossEntropyLoss {
+        CrossEntropyLoss {
+            reduction: Reduction::Mean,
+        }
+    }
+
+    pub fn reduction(mut self, reduction: Reduction) -> CrossEntropyLoss {
+        self.reduction = reduction;
+        self
+    }
+}
+
+pub enum Reduction {
+    Sum,
+    Mean,
+    None,
+}
+
+impl Default for Reduction {
+    fn default() -> Self {
+        Reduction::Mean
+    }
+}
+
+impl Criterion for CrossEntropyLoss {
+    fn output(&self, predict: Tensor, target: Tensor) -> Tensor {
+        assert_eq!(predict.shape(), target.shape(), "shape mismatch");
+        let output = operation::split_rows(predict.clone())
+            .into_iter()
+            .zip(operation::split_rows(target.clone()).into_iter())
+            .map(|x| {
+                let (input, target) = x;
+                let output = compound::cross_entropy(input, target);
+                unsafe {
+                    output.reshape(vec![1, 1]).unwrap_unchecked();
+                }
+                output
+            })
+            .collect::<Vec<_>>();
+        let output = operation::concat(output);
+
+        match self.reduction {
+            Reduction::None => output,
+            Reduction::Sum => operation::sum(output),
+            Reduction::Mean => operation::mean(output),
+        }
+    }
+}

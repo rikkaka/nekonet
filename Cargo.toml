@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.75"
+hashbrown = "0.14.1"
 rand = "0.8.5"

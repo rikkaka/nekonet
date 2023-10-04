@@ -14,7 +14,7 @@ fn test_add() {
     z.init_grad();
 
     z.forward();
-    z.set_grad_1();
+    z.one_grad();
     z.all_require_grad(true);
     z.backward().unwrap();
 
@@ -32,7 +32,7 @@ fn test_opposite() {
     y.init_grad();
 
     y.forward();
-    y.set_grad_1();
+    y.one_grad();
     y.all_require_grad(true);
     y.backward().unwrap();
 
@@ -52,7 +52,7 @@ fn test_reciprol() {
     y.init_grad();
 
     y.forward();
-    y.set_grad_1();
+    y.one_grad();
     y.all_require_grad(true);
     y.backward().unwrap();
 
@@ -72,7 +72,7 @@ fn test_scalar_mul() {
     y.init_grad();
 
     y.forward();
-    y.set_grad_1();
+    y.one_grad();
     y.all_require_grad(true);
     y.backward().unwrap();
 
@@ -89,7 +89,7 @@ fn test_pow() {
     y.init_grad();
 
     y.forward();
-    y.set_grad_1();
+    y.one_grad();
     y.all_require_grad(true);
     y.backward().unwrap();
 
@@ -114,7 +114,7 @@ fn test_ln() {
     y.init_grad();
 
     y.forward();
-    y.set_grad_1();
+    y.one_grad();
     y.all_require_grad(true);
     y.backward().unwrap();
 
@@ -139,7 +139,7 @@ fn test_matmul() {
     c.init_grad();
 
     c.forward();
-    c.set_grad_1();
+    c.one_grad();
     c.all_require_grad(true);
     c.backward().unwrap();
 
@@ -152,4 +152,51 @@ fn test_matmul() {
         b.grad().unwrap().borrow().as_slice(),
         &[5., 5., 7., 7., 9., 9.]
     );
+}
+
+#[test]
+fn test_concat() {
+    let a = Tensor::new(vec![1., 2., 3., 4.], vec![2, 2]);
+    let b = Tensor::new(vec![1., 2., 3., 4.], vec![2, 2]);
+
+    let c = operation::concat(vec![a.clone(), b.clone()]);
+
+    c.forward();
+    c.all_require_grad(true);
+    c.all_init_grad();
+    c.one_grad();
+    c.backward().unwrap();
+
+    assert_eq!(c.data().borrow().as_slice(), &[1., 2., 3., 4., 1., 2., 3., 4.]);
+    assert_eq!(c.shape().as_slice(), &[4, 2]);
+    assert_eq!(a.grad().unwrap().borrow().as_slice(), &[1., 1., 1., 1.]);
+    assert_eq!(b.grad().unwrap().borrow().as_slice(), &[1., 1., 1., 1.]);
+}
+
+#[test]
+fn test_split_rows() {
+    let a = Tensor::new(vec![1., 2., 3., 4., 1., 2., 3., 4.], vec![2, 4]);
+    
+    let outputs = operation::split_rows(a.clone());
+    let b = outputs[0].clone();
+    let c = outputs[1].clone();
+
+    b.forward();
+    c.forward();
+    b.all_require_grad(true);
+    c.all_require_grad(true);
+    b.all_init_grad();
+    c.all_init_grad();
+    b.one_grad();
+    c.one_grad();
+    b.backward().unwrap();
+    c.backward().unwrap();
+
+    assert_eq!(b.data().borrow().as_slice(), &[1., 2., 3., 4.]);
+    assert_eq!(c.data().borrow().as_slice(), &[1., 2., 3., 4.]);
+    assert_eq!(a.grad().unwrap().borrow().as_slice(), &[1., 1., 1., 1., 1., 1., 1., 1.]);
+    assert_eq!(b.shape().as_slice(), &[1, 4]);
+    assert_eq!(c.shape().as_slice(), &[1, 4]);
+
+
 }

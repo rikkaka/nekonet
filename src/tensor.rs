@@ -1,24 +1,49 @@
-pub mod activation;
-pub mod layer;
 pub mod operation;
 pub mod tensor_func;
+pub mod types;
+
+mod util;
+
+use types::*;
 
 use std::{
     cell::{Cell, RefCell},
+    collections::VecDeque,
+    fmt::Debug,
+    hash::Hash,
     rc::Rc,
 };
 
 use anyhow::{anyhow, Result};
 
+use hashbrown::HashSet;
+
 use self::tensor_func::{Head, TensorFunc};
 
-pub type Data = Vec<f32>;
-pub type Shape = Vec<usize>;
-pub type Grad = Vec<f32>;
-
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct Tensor {
     inner: Rc<TensorInner>,
+}
+
+impl PartialEq for Tensor {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.inner, &other.inner)
+    }
+}
+
+impl Eq for Tensor {}
+
+impl Hash for Tensor {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        Rc::as_ptr(&self.inner).hash(state);
+    }
+}
+
+impl Debug for Tensor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let addr = Rc::as_ptr(&self.inner);
+        write!(f, "Tensor(inner_addr={:p}, \ninner={:?})", addr, self.inner)
+    }
 }
 
 pub(crate) struct TensorInner {
@@ -27,7 +52,6 @@ pub(crate) struct TensorInner {
     grad: RefCell<Grad>,
     require_grad: Cell<bool>,
     input: RefCell<Box<dyn TensorFunc>>,
-    forwarded: Cell<bool>,
 }
 
 impl Tensor {
@@ -85,10 +109,6 @@ impl Tensor {
         }
     }
 
-    pub fn is_forwarded(&self) -> &Cell<bool> {
-        &self.inner.forwarded
-    }
-
     pub fn init_grad(&self) {
         self.inner.init_grad();
     }
@@ -102,56 +122,105 @@ impl Tensor {
         }
     }
 
-    pub fn set_grad_1(&self) {
+    pub fn one_grad(&self) {
         self.inner.set_grad(1.);
+    }
+
+    pub fn zero_grad(&self) {
+        self.inner.set_grad(0.);
+    }
+
+    pub fn all_zero_grad(&self) {
+        if self.is_require_grad() {
+            self.zero_grad();
+            for tensor in self.input_tensors() {
+                tensor.all_zero_grad();
+            }
+        }
     }
 
     pub fn dbg(&self) {
         self.inner.dbg();
-        println!("===== input tensors: ======");
-        for tensor in self.input_tensors() {
-            tensor.inner.dbg();
-        }
-        println!("==== end input tensors ====");
+        // println!("===== input tensors: ======");
+        // for tensor in self.input_tensors() {
+        //     tensor.inner.dbg();
+        // }
+        // println!("==== end input tensors ====");
     }
 
     pub fn forward(&self) {
-        self.inner
-            .input
-            .borrow()
-            .forward(self.data().borrow_mut(), &self.is_forwarded());
-        self.inner.forwarded.set(true);
+        let mut visited = HashSet::new();
+        self.forward_inner(&mut visited);
     }
 
-    pub fn backward(&self) -> Result<()> {
-        if !self.is_require_grad() {
-            return Ok(());
+    pub fn forward_inner(&self, visited: &mut HashSet<Tensor>) {
+        if visited.contains(self) {
+            return;
+        }
+        visited.insert(self.clone());
+
+        for tensor in self.input_tensors() {
+            tensor.forward_inner(visited);
         }
 
         self.inner
             .input
             .borrow_mut()
-            .backward(&self.data().borrow(), &self.grad()?.borrow())?;
+            .forward(self.clone());
+    }
+
+    pub fn backward(&self) -> Result<()> {
+        let mut q = VecDeque::from(vec![self.clone()]);
+        let mut visited = HashSet::new();
+
+        while !q.is_empty() {
+            let tensor = q.pop_front().unwrap();
+            if visited.contains(&tensor) {
+                continue;
+            }
+            visited.insert(tensor.clone());
+
+            tensor.backward_inner();
+            for tensor in tensor.input_tensors() {
+                q.push_back(tensor);
+            }
+        }
         Ok(())
+    }
+    
+    // renew the grads of all input tensors
+    fn backward_inner(&self) {
+        self.inner.input
+            .borrow_mut()
+            .backward(self.clone());
     }
 
     pub fn input_tensors(&self) -> Vec<Tensor> {
         self.inner.input.borrow().tensors()
     }
 
-    pub fn unforwarded(&self) {
-        self.inner.unforwarded();
-    }
-
-    pub fn all_unforwarded(&self) {
-        self.inner.unforwarded();
-        for tensor in self.input_tensors() {
-            tensor.inner.unforwarded();
-        }
-    }
-
     pub fn reshape(&self, shape: Shape) -> Result<()> {
         self.inner.reshape(shape)
+    }
+
+    pub fn all_tensors(&self) -> Vec<Tensor> {
+        let mut visited = HashSet::new();
+        let mut tensors = Vec::new();
+        let mut q = VecDeque::from(vec![self.clone()]);
+
+        while !q.is_empty() {
+            let tensor = q.pop_front().unwrap();
+            if visited.contains(&tensor) {
+                continue;
+            }
+            visited.insert(tensor.clone());
+
+            tensors.push(tensor.clone());
+            for tensor in tensor.input_tensors() {
+                q.push_back(tensor);
+            }
+        }
+        tensors
     }
 }
 
@@ -163,7 +232,6 @@ impl Default for TensorInner {
             grad: RefCell::new(Vec::new()),
             require_grad: Cell::new(false),
             input: RefCell::new(Box::new(Head::default())),
-            forwarded: Cell::new(false),
         }
     }
 }
@@ -240,13 +308,9 @@ impl TensorInner {
 
     fn grad(&self) -> Result<&RefCell<Grad>> {
         if self.grad.borrow().len() == 0 {
-            return Err(anyhow!("grad is not initialized, {:?}", self));
+            return Err(anyhow!("grad is not initialized"));
         }
         Ok(&self.grad)
-    }
-
-    fn unforwarded(&self) {
-        self.forwarded.set(false);
     }
 
     fn reshape(&self, shape: Shape) -> Result<()> {
@@ -264,5 +328,22 @@ impl TensorInner {
 
     fn dbg(&self) {
         dbg!(self);
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::operation::add;
+    use super::Tensor;
+    #[test]
+    fn test_all_tensors() {
+        let x1 = Tensor::new(vec![1., 2., 3., 4., 5., 6.], vec![2, 3]);
+        let x2 = Tensor::new(vec![1., 2., 3., 4., 5., 6.], vec![2, 3]);
+        let y1 = add(x1.clone(), x2.clone());
+        let y2 = add(x1.clone(), x2.clone());
+        let z = add(y1.clone(), y2.clone());
+        let out = add(z.clone(), z.clone());
+
+        assert_eq!(out.all_tensors().len(), 6);
     }
 }
