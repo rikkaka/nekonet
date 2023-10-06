@@ -1,4 +1,4 @@
-use nekonet::{layer, tensor::Tensor};
+use nekonet::{graph::Graph, layer, tensor::Tensor};
 
 #[test]
 fn test_linear() {
@@ -6,14 +6,12 @@ fn test_linear() {
 
     let fc1 = layer::Linear::new(3, 2);
     let y = fc1.output(x.clone());
-    y.all_require_grad(true);
-    x.require_grad(false);
-    y.all_init_grad();
 
-    y.forward();
+    let graph = Graph::from_output(y.clone());
+    graph.init_grad();
 
-    y.one_grad();
-    y.backward().unwrap();
+    graph.forward();
+    graph.backward();
 
     assert_eq!(y.shape(), &[2, 2]);
     assert_eq!(

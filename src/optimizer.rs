@@ -13,7 +13,7 @@ pub trait Optimizer {
 
 pub struct SGD {
     lr: f32,
-    
+
     params: Vec<Tensor>,
 }
 
@@ -23,6 +23,10 @@ impl SGD {
             lr,
             params: Vec::new(),
         }
+    }
+
+    pub fn set_lr(&mut self, lr: f32) {
+        self.lr = lr;
     }
 }
 

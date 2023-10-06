@@ -36,9 +36,9 @@ impl Default for Reduction {
 impl Criterion for CrossEntropyLoss {
     fn output(&self, predict: Tensor, target: Tensor) -> Tensor {
         assert_eq!(predict.shape(), target.shape(), "shape mismatch");
-        let output = operation::split_rows(predict.clone())
+        let output = operation::split(predict.clone(), 0)
             .into_iter()
-            .zip(operation::split_rows(target.clone()).into_iter())
+            .zip(operation::split(target.clone(), 0).into_iter())
             .map(|x| {
                 let (input, target) = x;
                 let output = compound::cross_entropy(input, target);
@@ -48,7 +48,7 @@ impl Criterion for CrossEntropyLoss {
                 output
             })
             .collect::<Vec<_>>();
-        let output = operation::concat(output);
+        let output = operation::concat(output, 0);
 
         match self.reduction {
             Reduction::None => output,

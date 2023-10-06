@@ -17,8 +17,8 @@ pub fn reciprocal(tensor: Tensor) -> Tensor {
     Tensor::from_input(Reciprocal::new(tensor))
 }
 
-pub fn scalar_mul(left: Tensor, right: Tensor) -> Tensor {
-    Tensor::from_input(ScalarMul::new(left, right))
+pub fn mul_scalar(tensor: Tensor, scalar: Tensor) -> Tensor {
+    Tensor::from_input(ScalarMul::new(tensor, scalar))
 }
 
 pub fn pow(base: Tensor, exponent: Tensor) -> Tensor {
@@ -33,37 +33,21 @@ pub fn matmul(left: Tensor, right: Tensor) -> Tensor {
     Tensor::from_input(MatMul::new(left, right))
 }
 
-pub fn slice(tensor: Tensor, start: usize, end: usize) -> Tensor {
-    Tensor::from_input(Slice::new(tensor, start, end))
+pub fn slice(tensor: Tensor, axis: usize, index: usize) -> Tensor {
+    Tensor::from_input(Slice::new(tensor, axis, index))
 }
 
-pub fn split_row(input: Tensor, row: usize) -> Tensor {
-    let shape = input.shape();
-    let start = row * shape[1..].iter().product::<usize>();
-    let end = (row + 1) * shape[1..].iter().product::<usize>();
-    let tensor = slice(input, start, end);
-    tensor
-        .reshape(
-            vec![1]
-                .into_iter()
-                .chain(shape[1..].iter().cloned())
-                .collect(),
-        )
-        .unwrap();
-    tensor
-}
-
-pub fn split_rows(tensor: Tensor) -> Vec<Tensor> {
+pub fn split(tensor: Tensor, axis: usize) -> Vec<Tensor> {
     let shape = tensor.shape();
     let mut result = Vec::new();
-    for i in 0..shape[0] {
-        result.push(split_row(tensor.clone(), i));
+    for i in 0..shape[axis] {
+        result.push(slice(tensor.clone(), axis, i));
     }
     result
 }
 
-pub fn concat(tensors: Vec<Tensor>) -> Tensor {
-    Tensor::from_input(Concat::new(tensors))
+pub fn concat(tensors: Vec<Tensor>, axis: usize) -> Tensor {
+    Tensor::from_input(Concat::new(tensors, axis))
 }
 
 pub fn sum(input: Tensor) -> Tensor {
@@ -72,4 +56,17 @@ pub fn sum(input: Tensor) -> Tensor {
 
 pub fn mean(input: Tensor) -> Tensor {
     Tensor::from_input(Mean::new(input))
+}
+
+pub fn var(input: Tensor, input_mean: Tensor) -> Tensor {
+    let input = add(input, opposite(input_mean));
+    let exp = Tensor::scalar(2.0).no_grad();
+    let input = pow(input, exp);
+    mean(input)
+}
+
+pub fn std(input: Tensor, input_mean: Tensor) -> Tensor {
+    let input_var = var(input.clone(), input_mean);
+    let exp = Tensor::scalar(0.5).no_grad();
+    pow(input_var, exp)
 }

@@ -3,6 +3,11 @@ use crate::tensor::types::*;
 pub struct ReLU(Tensor);
 pub struct Softmax(Tensor);
 
+pub struct CrossEntropy {
+    input: Tensor,
+    target: Tensor,
+}
+
 impl ReLU {
     pub fn new(tensor: Tensor) -> ReLU {
         ReLU(tensor)
@@ -78,10 +83,6 @@ impl TensorFunc for Softmax {
     fn tensors(&self) -> Vec<Tensor> {
         vec![self.0.clone()]
     }
-}
-pub struct CrossEntropy {
-    input: Tensor,
-    target: Tensor,
 }
 
 impl CrossEntropy {

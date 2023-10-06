@@ -1,4 +1,8 @@
-use nekonet::{tensor::{Tensor, operation}, optimizer::{SGD, Optimizer}};
+use nekonet::{
+    graph::Graph,
+    optimizer::{Optimizer, SGD},
+    tensor::{operation, Tensor},
+};
 
 #[test]
 fn test_sgd() {
@@ -10,14 +14,13 @@ fn test_sgd() {
 
     let z = operation::add(y1.clone(), y2.clone());
 
-    z.forward();
+    let graph = Graph::from_output(z.clone());
 
-    z.all_require_grad(true);
-    x1.require_grad(false);
+    graph.init_grad();
 
-    z.all_init_grad();
-    z.one_grad();
-    z.backward().unwrap();
+    graph.forward();
+    graph.zero_grad();
+    graph.backward();
 
     let mut sgd = SGD::new(0.01);
     sgd.add_params(vec![x2.clone(), y2.clone()]);
@@ -27,21 +30,19 @@ fn test_sgd() {
     assert_eq!(x2.data().borrow().as_slice(), &[0.96, 1.96, 2.94, 3.94]);
     assert_eq!(y2.data().borrow().as_slice(), &[0.99, 1.99, 0.99, 1.99]);
 
-    z.forward();
+    graph.forward();
     assert_eq!(z.data().borrow().as_slice(), &[7.83, 11.83, 15.63, 23.63]);
 
     let mut last_data = z.data().borrow().clone();
     for _ in 0..10 {
-        z.all_zero_grad();
-        z.one_grad();
-        z.backward().unwrap();
-        
+        graph.zero_grad();
+        graph.backward();
+
         sgd.step();
 
-        z.forward();
+        graph.forward();
         let now_data = z.data().borrow().clone();
         assert!(now_data < last_data);
         last_data = now_data;
     }
-
 }

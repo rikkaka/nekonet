@@ -1,5 +1,19 @@
+pub mod data_util;
+pub mod graph;
 pub mod layer;
-pub mod tensor;
 pub mod optimizer;
+pub mod tensor;
 
-// mod dev;
+pub mod prelude {
+    pub use crate::{
+        data_util::{DataLoader, Dataset},
+        graph::Graph,
+        layer::{
+            activation::{ReLU, Softmax},
+            criterion::{Criterion, CrossEntropyLoss},
+            Layer, Linear,
+        },
+        tensor::{types::*, Tensor},
+        optimizer::{Optimizer, self},
+    };
+}

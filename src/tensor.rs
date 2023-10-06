@@ -61,6 +61,10 @@ impl Tensor {
         }
     }
 
+    pub fn scalar(val: f32) -> Tensor {
+        Tensor::new(vec![val], vec![1])
+    }
+
     pub fn empty(shape: Shape) -> Tensor {
         let mut data = Vec::new();
         data.resize(shape.iter().product(), 0.0);
@@ -76,10 +80,35 @@ impl Tensor {
         Tensor::new(data, shape)
     }
 
+    pub fn zeros(shape: Shape) -> Tensor {
+        let mut data = Vec::new();
+        data.resize(shape.iter().product(), 0.0);
+        Tensor::new(data, shape)
+    }
+
+    pub fn ones(shape: Shape) -> Tensor {
+        let mut data = Vec::new();
+        data.resize(shape.iter().product(), 1.0);
+        Tensor::new(data, shape)
+    }
+
     pub(crate) fn from_input<TF: TensorFunc + 'static>(input: TF) -> Tensor {
         Tensor {
             inner: Rc::new(TensorInner::from_input(input)),
         }
+    }
+
+    pub fn set_data(&self, data: Data) {
+        assert_eq!(
+            data.len(),
+            self.inner.data.borrow().len(),
+            "data length mismatch"
+        );
+        *self.inner.data.borrow_mut() = data;
+    }
+
+    pub(crate) unsafe fn set_input(&self, input: Box<dyn TensorFunc>) {
+        *self.inner.input.borrow_mut() = input;
     }
 
     pub fn shape(&self) -> Shape {
@@ -94,32 +123,22 @@ impl Tensor {
         self.inner.grad()
     }
 
-    pub fn require_grad(&self, val: bool) {
+    pub fn require_grad(self, val: bool) -> Tensor {
         self.inner.require_grad(val);
+        self
+    }
+
+    pub fn no_grad(self) -> Tensor {
+        self.inner.require_grad(false);
+        self
     }
 
     pub fn is_require_grad(&self) -> bool {
         self.inner.is_require_grad()
     }
 
-    pub fn all_require_grad(&self, val: bool) {
-        self.require_grad(val);
-        for tensor in self.input_tensors() {
-            tensor.all_require_grad(val);
-        }
-    }
-
     pub fn init_grad(&self) {
         self.inner.init_grad();
-    }
-
-    pub fn all_init_grad(&self) {
-        if self.is_require_grad() {
-            self.init_grad();
-        }
-        for tensor in self.input_tensors() {
-            tensor.all_init_grad();
-        }
     }
 
     pub fn one_grad(&self) {
@@ -128,15 +147,6 @@ impl Tensor {
 
     pub fn zero_grad(&self) {
         self.inner.set_grad(0.);
-    }
-
-    pub fn all_zero_grad(&self) {
-        if self.is_require_grad() {
-            self.zero_grad();
-            for tensor in self.input_tensors() {
-                tensor.all_zero_grad();
-            }
-        }
     }
 
     pub fn dbg(&self) {
@@ -149,50 +159,23 @@ impl Tensor {
     }
 
     pub fn forward(&self) {
-        let mut visited = HashSet::new();
-        self.forward_inner(&mut visited);
+        self.inner.input.borrow_mut().forward(self.clone());
     }
 
-    pub fn forward_inner(&self, visited: &mut HashSet<Tensor>) {
-        if visited.contains(self) {
-            return;
-        }
-        visited.insert(self.clone());
+    // pub fn forward_inner(&self, visited: &mut HashSet<Tensor>) {
+    //     if visited.contains(self) {
+    //         return;
+    //     }
+    //     visited.insert(self.clone());
 
-        for tensor in self.input_tensors() {
-            tensor.forward_inner(visited);
-        }
+    //     for tensor in self.input_tensors() {
+    //         tensor.forward_inner(visited);
+    //     }
 
-        self.inner
-            .input
-            .borrow_mut()
-            .forward(self.clone());
-    }
+    // }
 
-    pub fn backward(&self) -> Result<()> {
-        let mut q = VecDeque::from(vec![self.clone()]);
-        let mut visited = HashSet::new();
-
-        while !q.is_empty() {
-            let tensor = q.pop_front().unwrap();
-            if visited.contains(&tensor) {
-                continue;
-            }
-            visited.insert(tensor.clone());
-
-            tensor.backward_inner();
-            for tensor in tensor.input_tensors() {
-                q.push_back(tensor);
-            }
-        }
-        Ok(())
-    }
-    
-    // renew the grads of all input tensors
-    fn backward_inner(&self) {
-        self.inner.input
-            .borrow_mut()
-            .backward(self.clone());
+    pub fn backward(&self) {
+        self.inner.input.borrow_mut().backward(self.clone());
     }
 
     pub fn input_tensors(&self) -> Vec<Tensor> {
@@ -202,26 +185,27 @@ impl Tensor {
     pub fn reshape(&self, shape: Shape) -> Result<()> {
         self.inner.reshape(shape)
     }
+}
 
-    pub fn all_tensors(&self) -> Vec<Tensor> {
-        let mut visited = HashSet::new();
-        let mut tensors = Vec::new();
-        let mut q = VecDeque::from(vec![self.clone()]);
+// return all tensors in the graph, with current tensor as the root, in topological order
+pub(crate) fn all_tensors_topological(outputs: Vec<Tensor>) -> Vec<Tensor> {
+    let mut visited = HashSet::new();
+    let mut tensors = Vec::new();
+    let mut q = VecDeque::from(outputs);
 
-        while !q.is_empty() {
-            let tensor = q.pop_front().unwrap();
-            if visited.contains(&tensor) {
-                continue;
-            }
-            visited.insert(tensor.clone());
-
-            tensors.push(tensor.clone());
-            for tensor in tensor.input_tensors() {
-                q.push_back(tensor);
-            }
+    while !q.is_empty() {
+        let tensor = q.pop_front().unwrap();
+        if visited.contains(&tensor) {
+            continue;
         }
-        tensors
+        visited.insert(tensor.clone());
+
+        tensors.push(tensor.clone());
+        for tensor in tensor.input_tensors() {
+            q.push_back(tensor);
+        }
     }
+    tensors
 }
 
 impl Default for TensorInner {
@@ -230,7 +214,7 @@ impl Default for TensorInner {
             data: RefCell::new(Vec::new()),
             shape: RefCell::new(Vec::new()),
             grad: RefCell::new(Vec::new()),
-            require_grad: Cell::new(false),
+            require_grad: Cell::new(true),
             input: RefCell::new(Box::new(Head::default())),
         }
     }
@@ -241,14 +225,10 @@ impl std::fmt::Debug for TensorInner {
         let data = self.data.borrow();
         let shape = self
             .shape
-            .borrow()
-            .iter()
-            .map(|x| x.to_string())
-            .collect::<Vec<String>>()
-            .join("x");
+            .borrow();
         write!(
             f,
-            "Tensor(shape={}, \ndata={:?}, \ngrad={:?}, \nrequire_grad={})",
+            "Tensor(shape={:?}, \ndata={:?}, \ngrad={:?}, \nrequire_grad={})",
             shape,
             data,
             self.grad.borrow(),
@@ -333,6 +313,8 @@ impl TensorInner {
 
 #[cfg(test)]
 mod test {
+    use super::all_tensors_topological;
+
     use super::operation::add;
     use super::Tensor;
     #[test]
@@ -344,6 +326,6 @@ mod test {
         let z = add(y1.clone(), y2.clone());
         let out = add(z.clone(), z.clone());
 
-        assert_eq!(out.all_tensors().len(), 6);
+        assert_eq!(all_tensors_topological(vec![out]).len(), 6);
     }
 }
