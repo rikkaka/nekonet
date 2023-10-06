@@ -1,6 +1,6 @@
 use super::{
     tensor_func::basic::{
-        Add, Concat, Ln, MatMul, Mean, Opposite, Pow, Reciprocal, ScalarMul, Slice, Sum,
+        Add, Concat, Ln, MatMul, Mean, Opposite, Pow, Reciprocal, MulScalar, Slice, Sum,
     },
     Tensor,
 };
@@ -18,7 +18,7 @@ pub fn reciprocal(tensor: Tensor) -> Tensor {
 }
 
 pub fn mul_scalar(tensor: Tensor, scalar: Tensor) -> Tensor {
-    Tensor::from_input(ScalarMul::new(tensor, scalar))
+    Tensor::from_input(MulScalar::new(tensor, scalar))
 }
 
 pub fn pow(base: Tensor, exponent: Tensor) -> Tensor {

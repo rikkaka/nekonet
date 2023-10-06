@@ -13,7 +13,7 @@ pub mod prelude {
             criterion::{Criterion, CrossEntropyLoss},
             Layer, Linear,
         },
+        optimizer::{self, Optimizer},
         tensor::{types::*, Tensor},
-        optimizer::{Optimizer, self},
     };
 }

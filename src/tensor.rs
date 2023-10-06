@@ -4,6 +4,7 @@ pub mod types;
 
 mod util;
 
+use ndarray::ArrayD;
 use types::*;
 
 use std::{
@@ -48,14 +49,13 @@ impl Debug for Tensor {
 
 pub(crate) struct TensorInner {
     data: RefCell<Data>,
-    shape: RefCell<Shape>,
-    grad: RefCell<Grad>,
+    grad: RefCell<Data>,
     require_grad: Cell<bool>,
     input: RefCell<Box<dyn TensorFunc>>,
 }
 
 impl Tensor {
-    pub fn new(data: Data, shape: Shape) -> Tensor {
+    pub fn new(data: RawData, shape: Shape) -> Tensor {
         Tensor {
             inner: Rc::new(TensorInner::new(data, shape)),
         }
@@ -112,7 +112,7 @@ impl Tensor {
     }
 
     pub fn shape(&self) -> Shape {
-        self.inner.shape.borrow().clone()
+        self.inner.data.borrow().shape().to_vec()
     }
 
     pub fn data(&self) -> &RefCell<Data> {
@@ -211,9 +211,8 @@ pub(crate) fn all_tensors_topological(outputs: Vec<Tensor>) -> Vec<Tensor> {
 impl Default for TensorInner {
     fn default() -> TensorInner {
         TensorInner {
-            data: RefCell::new(Vec::new()),
-            shape: RefCell::new(Vec::new()),
-            grad: RefCell::new(Vec::new()),
+            data: RefCell::new(ArrayD::zeros(vec![0])),
+            grad: RefCell::new(ArrayD::zeros(vec![0])),
             require_grad: Cell::new(true),
             input: RefCell::new(Box::new(Head::default())),
         }
@@ -222,30 +221,23 @@ impl Default for TensorInner {
 
 impl std::fmt::Debug for TensorInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let data = self.data.borrow();
-        let shape = self
-            .shape
-            .borrow();
         write!(
             f,
-            "Tensor(shape={:?}, \ndata={:?}, \ngrad={:?}, \nrequire_grad={})",
-            shape,
-            data,
+            "Tensor(data={:?}, \ngrad={:?})",
+            self.data.borrow(),
             self.grad.borrow(),
-            self.is_require_grad()
         )
     }
 }
 
 impl TensorInner {
-    fn new(data: Data, shape: Shape) -> TensorInner {
+    fn new(data: RawData, shape: Shape) -> TensorInner {
         assert_eq!(data.len(), shape.iter().product());
 
+        let data = ArrayD::from_shape_vec(shape.clone(), data).unwrap();
         let data = RefCell::new(data);
-        let shape = RefCell::new(shape);
         TensorInner {
             data,
-            shape,
             ..Default::default()
         }
     }
@@ -253,16 +245,13 @@ impl TensorInner {
     fn from_input<TF: TensorFunc + 'static>(input: TF) -> TensorInner {
         let shape = input.output_shape();
 
-        let mut data = Vec::new();
-        data.resize(shape.iter().product(), 0.0);
+        let data = ArrayD::zeros(shape);
         let data = RefCell::new(data);
-        let shape = RefCell::new(shape);
 
         let input = RefCell::new(Box::new(input) as Box<dyn TensorFunc>);
 
         TensorInner {
             data,
-            shape,
             input,
 
             ..Default::default()
@@ -279,7 +268,7 @@ impl TensorInner {
 
     fn init_grad(&self) {
         let mut grad = self.grad.borrow_mut();
-        grad.resize(self.data.borrow().len(), 0.0);
+        *grad = ArrayD::zeros(self.data.borrow().shape().to_vec());
     }
 
     fn set_grad(&self, val: f32) {
@@ -294,15 +283,7 @@ impl TensorInner {
     }
 
     fn reshape(&self, shape: Shape) -> Result<()> {
-        if self.shape.borrow().iter().product::<usize>() != shape.iter().product::<usize>() {
-            return Err(anyhow!(
-                "cannot reshape tensor of shape {:?} to {:?}",
-                self.shape,
-                shape
-            ));
-        }
-
-        *self.shape.borrow_mut() = shape;
+        self.data.borrow_mut().into_shape(shape)?;
         Ok(())
     }
 

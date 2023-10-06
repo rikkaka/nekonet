@@ -35,7 +35,6 @@ fn main() {
     let mut optimizer = optimizer::SGD::new(0.001);
     optimizer.add_params(bp.params());
 
-
     let (input_data, target_data) = dataloader_test.iter().next().unwrap();
 
     let input_test = Tensor::new(input_data.clone(), vec![10_000, 784]).no_grad();
@@ -67,9 +66,6 @@ fn main() {
         let acc = accuracy(&pred_class, &tst_lbl);
         println!("epoch: {}, loss: {}, acc: {}", i, loss_test_data[0], acc);
     }
-
-    
-
 }
 
 struct MnistDataset {
