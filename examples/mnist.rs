@@ -1,5 +1,6 @@
 use mnist::*;
 
+use ndarray::{Array1, ArrayD};
 use nekonet::prelude::*;
 
 static BATCH_SIZE: usize = 20;
@@ -63,7 +64,7 @@ fn main() {
         gragh_test.forward();
         let loss_test_data = loss_test.data().borrow().clone();
         let pred_class = predict(&pred_test.data().borrow());
-        let acc = accuracy(&pred_class, &tst_lbl);
+        let acc = accuracy(&pred_class.into_raw_vec(), &tst_lbl);
         println!("epoch: {}, loss: {}, acc: {}", i, loss_test_data[0], acc);
     }
 }
@@ -94,7 +95,7 @@ impl Dataset for MnistDataset {
         self.lbl.len() / 10
     }
 
-    fn get(&self, index: usize) -> (nekonet::tensor::types::Data, nekonet::tensor::types::Data) {
+    fn get(&self, index: usize) -> (RawData, RawData) {
         let img = self.img[index * 784..(index + 1) * 784].to_vec();
         let lbl = self.lbl[index * 10..(index + 1) * 10].to_vec();
         (img, lbl)
@@ -155,20 +156,20 @@ impl Bp {
     }
 }
 
-fn predict(pred_onehot: &Vec<f32>) -> Vec<u8> {
-    let mut pred = vec![];
-    for i in 0..pred_onehot.len() / 10 {
+fn predict(pred_onehot: &ArrayD<f32>) -> Array1<u8> {
+    let mut pred_class = Array1::zeros(pred_onehot.shape()[0]);
+    for (i, row) in pred_onehot.rows().into_iter().enumerate() {
         let mut max = 0.;
         let mut max_index = 0;
-        for j in 0..10 {
-            if pred_onehot[i * 10 + j] > max {
-                max = pred_onehot[i * 10 + j];
+        for (j, &x) in row.iter().enumerate() {
+            if x > max {
+                max = x;
                 max_index = j;
             }
         }
-        pred.push(max_index as u8);
+        pred_class[i] = max_index as u8;
     }
-    pred
+    pred_class
 }
 
 fn accuracy(pred: &Vec<u8>, target: &Vec<u8>) -> f32 {

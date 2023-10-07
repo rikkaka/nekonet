@@ -10,6 +10,7 @@ use nekonet::{
         Layer,
     },
     optimizer::{self, Optimizer},
+    prelude::RawData,
     tensor::{types::Data, Tensor},
 };
 
@@ -33,7 +34,7 @@ fn main() {
     let dataset = MyDataset::new();
     let dataloader = DataLoader::new(&dataset, 20, true);
 
-    for _ in 0..200 {
+    for _ in 0..50 {
         for (input_batch, target_batch) in dataloader.iter() {
             input_placeholder.set_data(input_batch.clone());
             target_placeholder.set_data(target_batch.clone());
@@ -42,7 +43,7 @@ fn main() {
             graph.zero_grad();
             graph.backward();
 
-            dbg!(&loss);
+            dbg!(loss.data().borrow()[0]);
 
             optimizer.step();
         }
@@ -62,7 +63,7 @@ fn main() {
     let gragh = Graph::from_output(loss.clone());
     gragh.forward();
 
-    dbg!(loss);
+    dbg!(loss.data().borrow()[0]);
 }
 
 struct Bp {
@@ -121,8 +122,8 @@ impl Bp {
 }
 
 struct MyDataset {
-    input_data: Vec<Data>,
-    target_data: Vec<Data>,
+    input_data: Vec<RawData>,
+    target_data: Vec<RawData>,
 }
 
 impl MyDataset {
@@ -151,7 +152,7 @@ impl Dataset for MyDataset {
         self.input_data.len()
     }
 
-    fn get(&self, index: usize) -> (Data, Data) {
+    fn get(&self, index: usize) -> (RawData, RawData) {
         (
             self.input_data[index].clone(),
             self.target_data[index].clone(),

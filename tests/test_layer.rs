@@ -15,8 +15,8 @@ fn test_linear() {
 
     assert_eq!(y.shape(), &[2, 2]);
     assert_eq!(
-        fc1.weight().grad().unwrap().borrow().as_slice(),
+        fc1.weight().raw_grad().unwrap().as_slice(),
         &[5.0, 5.0, 7.0, 7.0, 9.0, 9.0]
     );
-    assert_eq!(fc1.bias().grad().unwrap().borrow().as_slice(), &[2.0, 2.0]);
+    assert_eq!(fc1.bias().raw_grad().unwrap().as_slice(), &[2.0, 2.0]);
 }

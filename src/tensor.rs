@@ -98,18 +98,19 @@ impl Tensor {
         }
     }
 
-    pub fn set_data(&self, data: Data) {
+    pub fn set_data(&self, data: RawData) {
         assert_eq!(
             data.len(),
             self.inner.data.borrow().len(),
             "data length mismatch"
         );
-        *self.inner.data.borrow_mut() = data;
+        let shape = self.shape();
+        *self.inner.data.borrow_mut() = ArrayD::from_shape_vec(shape, data).unwrap();
     }
 
-    pub(crate) unsafe fn set_input(&self, input: Box<dyn TensorFunc>) {
-        *self.inner.input.borrow_mut() = input;
-    }
+    // pub(crate) unsafe fn set_input(&self, input: Box<dyn TensorFunc>) {
+    //     *self.inner.input.borrow_mut() = input;
+    // }
 
     pub fn shape(&self) -> Shape {
         self.inner.data.borrow().shape().to_vec()
@@ -119,8 +120,16 @@ impl Tensor {
         &self.inner.data
     }
 
+    pub fn raw_data(&self) -> RawData {
+        self.inner.data.borrow().clone().into_raw_vec()
+    }
+
     pub fn grad(&self) -> Result<&RefCell<Grad>> {
         self.inner.grad()
+    }
+
+    pub fn raw_grad(&self) -> Result<RawData> {
+        Ok(self.inner.grad()?.borrow().clone().into_raw_vec())
     }
 
     pub fn require_grad(self, val: bool) -> Tensor {
@@ -282,8 +291,8 @@ impl TensorInner {
         Ok(&self.grad)
     }
 
-    fn reshape(&self, shape: Shape) -> Result<()> {
-        self.data.borrow_mut().into_shape(shape)?;
+    fn reshape(&self, new_shape: Shape) -> Result<()> {
+        self.data.borrow_mut().to_shape(new_shape)?;
         Ok(())
     }
 
