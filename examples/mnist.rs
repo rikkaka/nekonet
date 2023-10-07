@@ -4,7 +4,7 @@ use ndarray::{Array1, ArrayD};
 use nekonet::prelude::*;
 
 static BATCH_SIZE: usize = 20;
-static EPOCH: usize = 100;
+static EPOCH: usize = 10;
 
 fn main() {
     let Mnist {
