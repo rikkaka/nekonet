@@ -33,7 +33,7 @@ fn main() {
     let dataset = MyDataset::new();
     let dataloader = DataLoader::new(&dataset, 20, true);
 
-    for _ in 0..200 {
+    for _ in 0..50 {
         for (input_batch, target_batch) in dataloader.iter() {
             input_placeholder.set_data(input_batch.clone());
             target_placeholder.set_data(target_batch.clone());
