@@ -54,7 +54,11 @@ impl TensorFunc for Softmax {
 
     fn cal_output_data(&self) -> Data {
         let input = &self.0.data().borrow();
-        let output = input.mapv(|x| x.exp());
+        // let input = input.to_owned();
+        let max_val = input.iter().fold(f32::MIN, |x, &y| x.max(y));
+        let input = input.mapv(|x| x - max_val);
+        let output = input.mapv(|x| {let x = x.exp();
+        if x.is_infinite() {panic!("123")} else {x}});
         let sum = output.sum();
         output.mapv(|x| x / sum)
     }
@@ -100,13 +104,12 @@ impl TensorFunc for CrossEntropy {
 
         let output = Zip::from(input.view())
             .and(target.view())
-            .map_collect(|x, y| -y * (x + 1e-10).ln())
+            .map_collect(|x, y| -y * (x + 1e-20).ln())
             .sum();
         ArrayD::from_elem(vec![1], output)
     }
 
-    fn renew_grad(&self, _output_data: &Data, output_grad: &Grad) {
-        let output_grad = output_grad[0];
+    fn renew_grad(&self, _output_data: &Data, _output_grad: &Grad) {
         let input = &self.input.data().borrow();
         let target = &self.target.data().borrow();
 
@@ -116,10 +119,12 @@ impl TensorFunc for CrossEntropy {
             Zip::from(input_grad.view_mut())
                 .and(input.view())
                 .and(target.view())
-                .for_each(|g, p, y| *g += -y / (p + 1e-10))
+                .for_each(|g, p, y| *g += -y / (p + 1e-20))
         }
 
-        if self.target.is_require_grad() {}
+        if self.target.is_require_grad() {
+            unimplemented!()
+        }
     }
 
     fn tensors(&self) -> Vec<Tensor> {

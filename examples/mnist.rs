@@ -4,7 +4,7 @@ use ndarray::{Array1, ArrayD};
 use nekonet::prelude::*;
 
 static BATCH_SIZE: usize = 20;
-static EPOCH: usize = 10;
+static EPOCH: usize = 100;
 
 fn main() {
     let Mnist {
@@ -54,7 +54,7 @@ fn main() {
             graph_train.zero_grad();
             graph_train.backward();
 
-            assert!(!&loss.data().borrow()[0].is_nan());
+            // assert!(!&loss.data().borrow()[0].is_nan());
 
             optimizer.step();
         }

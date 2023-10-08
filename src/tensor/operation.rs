@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use super::{
     tensor_func::basic::{
-        Add, Concat, Ln, MatMul, Mean, MulScalar, Opposite, Pow, Reciprocal, SliceAxis, Sum,
+        Add, Concat, Ln, MatMul, Mean, MulScalar, Opposite, Pow, Reciprocal, SliceAxis, Sum, Debugger,
     },
     types::*,
     Tensor,
@@ -72,4 +72,8 @@ pub fn std(input: Tensor, input_mean: Tensor) -> Tensor {
     let input_var = var(input.clone(), input_mean);
     let exp = Tensor::scalar(0.5).no_grad();
     pow(input_var, exp)
+}
+
+pub fn debugger(tensor: Tensor, marker: usize) -> Tensor {
+    Tensor::from_input(Debugger::new(tensor, marker))
 }

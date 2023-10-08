@@ -43,7 +43,7 @@ impl Hash for Tensor {
 impl Debug for Tensor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let addr = Rc::as_ptr(&self.inner);
-        write!(f, "Tensor(inner_addr={:p}, \ninner={:?})", addr, self.inner)
+        write!(f, "Tensor(inner_addr={:p}, \ninner={:?}, \nis_require_grad={:?})", addr, self.inner, self.is_require_grad())
     }
 }
 
@@ -142,12 +142,18 @@ impl Tensor {
         self
     }
 
+    pub fn as_require_grad(&self, tensor: &Tensor) {
+        tensor.inner.require_grad(self.is_require_grad());
+    }
+
     pub fn is_require_grad(&self) -> bool {
         self.inner.is_require_grad()
     }
 
     pub fn init_grad(&self) {
-        self.inner.init_grad();
+        if self.is_require_grad() {
+            self.inner.init_grad();
+        }
     }
 
     pub fn one_grad(&self) {
@@ -160,28 +166,11 @@ impl Tensor {
 
     pub fn dbg(&self) {
         self.inner.dbg();
-        // println!("===== input tensors: ======");
-        // for tensor in self.input_tensors() {
-        //     tensor.inner.dbg();
-        // }
-        // println!("==== end input tensors ====");
     }
 
     pub fn forward(&self) {
         self.inner.input.borrow_mut().forward(self.clone());
     }
-
-    // pub fn forward_inner(&self, visited: &mut HashSet<Tensor>) {
-    //     if visited.contains(self) {
-    //         return;
-    //     }
-    //     visited.insert(self.clone());
-
-    //     for tensor in self.input_tensors() {
-    //         tensor.forward_inner(visited);
-    //     }
-
-    // }
 
     pub fn backward(&self) {
         self.inner.input.borrow_mut().backward(self.clone());

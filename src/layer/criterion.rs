@@ -39,12 +39,10 @@ impl Criterion for CrossEntropyLoss {
         let output = operation::split(predict.clone(), 0)
             .into_iter()
             .zip(operation::split(target.clone(), 0).into_iter())
-            .map(|x| {
-                let (input, target) = x;
-                let output = compound::cross_entropy(input, target);
-                unsafe {
-                    output.reshape(vec![1, 1]).unwrap_unchecked();
-                }
+            .map(|(ip, tg)| {
+                let tg = tg.no_grad();
+                let output = compound::cross_entropy(ip, tg);
+                output.reshape(vec![1, 1]).unwrap();
                 output
             })
             .collect::<Vec<_>>();

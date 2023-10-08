@@ -11,7 +11,7 @@ use nekonet::{
     },
     optimizer::{self, Optimizer},
     prelude::RawData,
-    tensor::{types::Data, Tensor},
+    tensor::{types::Data, Tensor, tensor_func::basic::Debugger, operation::debugger},
 };
 
 fn main() {
@@ -34,7 +34,7 @@ fn main() {
     let dataset = MyDataset::new();
     let dataloader = DataLoader::new(&dataset, 20, true);
 
-    for _ in 0..50 {
+    for _ in 0..10 {
         for (input_batch, target_batch) in dataloader.iter() {
             input_placeholder.set_data(input_batch.clone());
             target_placeholder.set_data(target_batch.clone());
@@ -78,7 +78,7 @@ struct Bp {
 }
 
 impl Bp {
-    fn new() -> Self {
+    fn new() -> Self {        
         let fc1 = layer::Linear::new(1, 10);
         let fc2 = layer::Linear::new(10, 6);
         let fc3 = layer::Linear::new(6, 2);
@@ -104,8 +104,8 @@ impl Bp {
         let out = self.fc2.output(out.clone());
         let out = self.relu.output(out.clone());
         let out = self.fc3.output(out.clone());
-        let pred = self.softmax.output(out.clone());
-        pred
+        let out = self.softmax.output(out.clone());
+        out
     }
 
     fn loss(&self, pred: Tensor, target: Tensor) -> Tensor {

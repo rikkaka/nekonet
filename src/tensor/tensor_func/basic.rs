@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::{ops::Range, borrow::BorrowMut};
 
 use ndarray::{concatenate, ArrayD, ArrayViewD, Axis, Ix2, Zip};
 
@@ -165,7 +165,7 @@ impl TensorFunc for Reciprocal {
 
     fn cal_output_data(&self) -> Data {
         let input = &self.0.data().borrow();
-        input.mapv(|x| 1. / (x + 1e-10))
+        input.mapv(|x| x.recip())
     }
 
     fn renew_grad(&self, _output_data: &Data, output_grad: &Grad) {
@@ -174,7 +174,7 @@ impl TensorFunc for Reciprocal {
         ndarray::Zip::from(input_grad.view_mut())
             .and(input.view())
             .and(output_grad)
-            .for_each(|x, y, z| *x += -z * (1. / (y + 1e-10)).powf(2.));
+            .for_each(|x, y, z| *x += -z * y.recip().powf(2.));
     }
 
     fn tensors(&self) -> Vec<Tensor> {
@@ -264,7 +264,7 @@ impl TensorFunc for Ln {
 
     fn cal_output_data(&self) -> Data {
         let input = &self.0.data().borrow();
-        input.mapv(|x| (x + 1e-10).ln())
+        input.mapv(|x| x.ln())
     }
 
     fn renew_grad(&self, _output_data: &Data, output_grad: &Grad) {
@@ -273,7 +273,7 @@ impl TensorFunc for Ln {
         ndarray::Zip::from(input_grad.view_mut())
             .and(input.view())
             .and(output_grad)
-            .for_each(|x, y, z| *x += z / (y + 1e-10));
+            .for_each(|x, y, z| *x += z / y);
     }
 
     fn tensors(&self) -> Vec<Tensor> {
@@ -463,6 +463,45 @@ impl TensorFunc for Mean {
         input_grad.mapv_inplace(|x| x + output_grad[0] / numbers);
     }
 
+    fn tensors(&self) -> Vec<Tensor> {
+        vec![self.input.clone()]
+    }
+}
+
+pub struct Debugger {
+    input: Tensor, 
+    marker: usize
+}
+
+impl Debugger {
+    pub fn new(tensor: Tensor, marker: usize) -> Debugger {
+        Debugger {
+            input: tensor,
+            marker
+        }
+    }
+}
+
+impl TensorFunc for Debugger {
+    fn output_shape(&self) -> Shape {
+        self.input.shape().clone()
+    }
+
+    fn cal_output_data(&self) -> Data {
+        let data = self.input.data().borrow();
+        if data.iter().any(|x| x.is_nan()) {
+            println!("{:?}", self.marker);
+            panic!("NaN detected");
+        } else {
+            data.clone()
+        }
+    }
+
+    fn renew_grad(&self, _output_data: &Data, output_grad: &Grad) {
+        let mut input_grad = self.input.grad().unwrap().borrow_mut();
+        input_grad.zip_mut_with(output_grad, |x, y| *x += y);
+    }
+    
     fn tensors(&self) -> Vec<Tensor> {
         vec![self.input.clone()]
     }
