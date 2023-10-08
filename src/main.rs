@@ -1,6 +1,5 @@
 use std::vec;
 
-use hashbrown::HashMap;
 use nekonet::{
     data_util::{DataLoader, Dataset},
     graph::Graph,
@@ -11,7 +10,7 @@ use nekonet::{
     },
     optimizer::{self, Optimizer},
     prelude::RawData,
-    tensor::{types::Data, Tensor, tensor_func::basic::Debugger, operation::debugger},
+    tensor::Tensor,
 };
 
 fn main() {
@@ -78,7 +77,7 @@ struct Bp {
 }
 
 impl Bp {
-    fn new() -> Self {        
+    fn new() -> Self {
         let fc1 = layer::Linear::new(1, 10);
         let fc2 = layer::Linear::new(10, 6);
         let fc3 = layer::Linear::new(6, 2);

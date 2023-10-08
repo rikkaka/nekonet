@@ -1,10 +1,6 @@
 pub mod basic;
 pub mod compound;
 
-use std::cell::{Cell, RefMut};
-
-use anyhow::Result;
-
 use super::{types::*, Tensor};
 
 pub(crate) trait TensorFunc {

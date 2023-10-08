@@ -43,7 +43,13 @@ impl Hash for Tensor {
 impl Debug for Tensor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let addr = Rc::as_ptr(&self.inner);
-        write!(f, "Tensor(inner_addr={:p}, \ninner={:?}, \nis_require_grad={:?})", addr, self.inner, self.is_require_grad())
+        write!(
+            f,
+            "Tensor(inner_addr={:p}, \ninner={:?}, \nis_require_grad={:?})",
+            addr,
+            self.inner,
+            self.is_require_grad()
+        )
     }
 }
 

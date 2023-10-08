@@ -1,6 +1,9 @@
 use nekonet::{
     graph::Graph,
-    tensor::{operation::{self, sum}, Tensor},
+    tensor::{
+        operation::{self, sum},
+        Tensor,
+    },
 };
 
 #[test]

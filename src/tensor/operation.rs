@@ -2,9 +2,9 @@ use std::ops::Range;
 
 use super::{
     tensor_func::basic::{
-        Add, Concat, Ln, MatMul, Mean, MulScalar, Opposite, Pow, Reciprocal, SliceAxis, Sum, Debugger,
+        Add, Concat, Debugger, Ln, MatMul, Mean, MulScalar, Opposite, Pow, Reciprocal, SliceAxis,
+        Sum,
     },
-    types::*,
     Tensor,
 };
 

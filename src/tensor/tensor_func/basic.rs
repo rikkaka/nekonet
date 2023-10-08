@@ -1,4 +1,4 @@
-use std::{ops::Range, borrow::BorrowMut};
+use std::ops::Range;
 
 use ndarray::{concatenate, ArrayD, ArrayViewD, Axis, Ix2, Zip};
 
@@ -469,15 +469,15 @@ impl TensorFunc for Mean {
 }
 
 pub struct Debugger {
-    input: Tensor, 
-    marker: usize
+    input: Tensor,
+    marker: usize,
 }
 
 impl Debugger {
     pub fn new(tensor: Tensor, marker: usize) -> Debugger {
         Debugger {
             input: tensor,
-            marker
+            marker,
         }
     }
 }
@@ -501,7 +501,7 @@ impl TensorFunc for Debugger {
         let mut input_grad = self.input.grad().unwrap().borrow_mut();
         input_grad.zip_mut_with(output_grad, |x, y| *x += y);
     }
-    
+
     fn tensors(&self) -> Vec<Tensor> {
         vec![self.input.clone()]
     }

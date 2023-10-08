@@ -57,8 +57,14 @@ impl TensorFunc for Softmax {
         // let input = input.to_owned();
         let max_val = input.iter().fold(f32::MIN, |x, &y| x.max(y));
         let input = input.mapv(|x| x - max_val);
-        let output = input.mapv(|x| {let x = x.exp();
-        if x.is_infinite() {panic!("123")} else {x}});
+        let output = input.mapv(|x| {
+            let x = x.exp();
+            if x.is_infinite() {
+                panic!("123")
+            } else {
+                x
+            }
+        });
         let sum = output.sum();
         output.mapv(|x| x / sum)
     }

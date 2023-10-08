@@ -59,53 +59,53 @@ impl Linear {
 }
 
 // for shape of [batch_size, dims]
-#[derive(Clone, Debug)]
-pub struct BatchNormPlain {
-    gamma: Tensor,
-    beta: Tensor,
+// #[derive(Clone, Debug)]
+// pub struct BatchNormPlain {
+//     gamma: Tensor,
+//     beta: Tensor,
 
-    running_mean: Option<Tensor>,
-    running_std: Option<Tensor>,
+//     running_mean: Option<Tensor>,
+//     running_std: Option<Tensor>,
 
-    momentum: f32,
-}
+//     momentum: f32,
+// }
 
-impl Layer for BatchNormPlain {
-    fn params(&self) -> Vec<Tensor> {
-        vec![self.gamma.clone(), self.beta.clone()]
-    }
+// impl Layer for BatchNormPlain {
+//     fn params(&self) -> Vec<Tensor> {
+//         vec![self.gamma.clone(), self.beta.clone()]
+//     }
 
-    fn leaf_tensors(&self) -> Vec<Tensor> {
-        vec![
-            self.running_mean.clone().unwrap(),
-            self.running_std.clone().unwrap(),
-        ]
-    }
-}
+//     fn leaf_tensors(&self) -> Vec<Tensor> {
+//         vec![
+//             self.running_mean.clone().unwrap(),
+//             self.running_std.clone().unwrap(),
+//         ]
+//     }
+// }
 
-impl BatchNormPlain {
-    pub fn new(num_features: usize, momentum: f32) -> Self {
-        assert!(momentum >= 0.0 && momentum <= 1.0);
-        BatchNormPlain {
-            gamma: Tensor::ones(vec![num_features]),
-            beta: Tensor::zeros(vec![num_features]),
-            running_mean: None,
-            running_std: None,
-            momentum,
-        }
-    }
+// impl BatchNormPlain {
+//     pub fn new(num_features: usize, momentum: f32) -> Self {
+//         assert!(momentum >= 0.0 && momentum <= 1.0);
+//         BatchNormPlain {
+//             gamma: Tensor::ones(vec![num_features]),
+//             beta: Tensor::zeros(vec![num_features]),
+//             running_mean: None,
+//             running_std: None,
+//             momentum,
+//         }
+//     }
 
-    // pub fn output(&self, input: Tensor, is_eval: bool) -> Vec<Tensor> {
-    //     assert!(input.shape().len() == 2, "input shape must be [batch_size, dims]");
+//     // pub fn output(&self, input: Tensor, is_eval: bool) -> Vec<Tensor> {
+//     //     assert!(input.shape().len() == 2, "input shape must be [batch_size, dims]");
 
-    //     let batch_size = input.shape()[0];
-    //     let num_features = input.shape()[1];
+//     //     let batch_size = input.shape()[0];
+//     //     let num_features = input.shape()[1];
 
-    //     let outputs = split(input, 1).iter().map(|tensor| {
-    //         let mean = mean(tensor.clone());
-    //         let std = std(tensor.clone(), mean);
-    //         let output = add(tensor.clone(), opposite(mean));
-    //         let output = mul_scalar(output, reciprocal(std));
-    //     });
-    // }
-}
+//     //     let outputs = split(input, 1).iter().map(|tensor| {
+//     //         let mean = mean(tensor.clone());
+//     //         let std = std(tensor.clone(), mean);
+//     //         let output = add(tensor.clone(), opposite(mean));
+//     //         let output = mul_scalar(output, reciprocal(std));
+//     //     });
+//     // }
+// }
