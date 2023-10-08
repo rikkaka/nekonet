@@ -1,5 +1,6 @@
 use crate::tensor::{self, Tensor};
 
+#[derive(Default)]
 pub struct Builder {
     outputs: Vec<Tensor>,
 }

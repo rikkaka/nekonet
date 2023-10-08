@@ -4,6 +4,9 @@ use crate::tensor::types::RawData;
 
 pub trait Dataset {
     fn len(&self) -> usize;
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
     fn get(&self, index: usize) -> (RawData, RawData);
 }
 

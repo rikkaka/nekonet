@@ -103,8 +103,7 @@ impl Bp {
         let out = self.fc2.output(out.clone());
         let out = self.relu.output(out.clone());
         let out = self.fc3.output(out.clone());
-        let out = self.softmax.output(out.clone());
-        out
+        self.softmax.output(out.clone())
     }
 
     fn loss(&self, pred: Tensor, target: Tensor) -> Tensor {

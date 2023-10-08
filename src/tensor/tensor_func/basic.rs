@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use ndarray::{concatenate, ArrayD, ArrayViewD, Axis, Ix2, Zip};
+use ndarray::{ArrayD, Axis, Zip};
 
 use crate::{
     into_2d,
@@ -365,7 +365,7 @@ impl TensorFunc for SliceAxis {
 
 impl Concat {
     pub fn new(inputs: Vec<Tensor>, axis: usize) -> Concat {
-        assert!(inputs.len() > 0, "inputs should not be empty");
+        assert!(!inputs.is_empty(), "inputs should not be empty");
         assert!(axis < inputs[0].shape().len(), "axis out of range");
 
         Concat { inputs, axis }

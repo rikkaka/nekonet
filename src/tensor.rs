@@ -80,8 +80,8 @@ impl Tensor {
     pub fn random(shape: Shape) -> Tensor {
         let mut data = Vec::new();
         data.resize(shape.iter().product(), 0.0);
-        for i in 0..data.len() {
-            data[i] = rand::random::<f32>() * 2.0 - 1.0;
+        for item in &mut data {
+            *item = rand::random::<f32>() * 2.0 - 1.0;
         }
         Tensor::new(data, shape)
     }
@@ -218,7 +218,7 @@ impl Default for TensorInner {
             data: RefCell::new(ArrayD::zeros(vec![0])),
             grad: RefCell::new(ArrayD::zeros(vec![0])),
             require_grad: Cell::new(true),
-            input: RefCell::new(Box::new(Head::default())),
+            input: RefCell::new(Box::<Head>::default()),
         }
     }
 }

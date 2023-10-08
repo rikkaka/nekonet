@@ -4,6 +4,7 @@ pub trait Criterion {
     fn output(&self, predict: Tensor, target: Tensor) -> Tensor;
 }
 
+#[derive(Default)]
 pub struct CrossEntropyLoss {
     reduction: Reduction,
 }
@@ -21,16 +22,12 @@ impl CrossEntropyLoss {
     }
 }
 
+#[derive(Default)]
 pub enum Reduction {
     Sum,
+    #[default]
     Mean,
     None,
-}
-
-impl Default for Reduction {
-    fn default() -> Self {
-        Reduction::Mean
-    }
 }
 
 impl Criterion for CrossEntropyLoss {
@@ -38,7 +35,7 @@ impl Criterion for CrossEntropyLoss {
         assert_eq!(predict.shape(), target.shape(), "shape mismatch");
         let output = operation::split(predict.clone(), 0)
             .into_iter()
-            .zip(operation::split(target.clone(), 0).into_iter())
+            .zip(operation::split(target.clone(), 0))
             .map(|(ip, tg)| {
                 let tg = tg.no_grad();
                 let output = compound::cross_entropy(ip, tg);
