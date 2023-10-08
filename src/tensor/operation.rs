@@ -1,6 +1,9 @@
+use std::ops::Range;
+
 use super::{
     tensor_func::basic::{
-        Add, Concat, Ln, MatMul, Mean, Opposite, Pow, Reciprocal, ScalarMul, Slice, Sum,
+        Add, Concat, Debugger, Ln, MatMul, Mean, MulScalar, Opposite, Pow, Reciprocal, SliceAxis,
+        Sum,
     },
     Tensor,
 };
@@ -18,7 +21,7 @@ pub fn reciprocal(tensor: Tensor) -> Tensor {
 }
 
 pub fn mul_scalar(tensor: Tensor, scalar: Tensor) -> Tensor {
-    Tensor::from_input(ScalarMul::new(tensor, scalar))
+    Tensor::from_input(MulScalar::new(tensor, scalar))
 }
 
 pub fn pow(base: Tensor, exponent: Tensor) -> Tensor {
@@ -33,15 +36,15 @@ pub fn matmul(left: Tensor, right: Tensor) -> Tensor {
     Tensor::from_input(MatMul::new(left, right))
 }
 
-pub fn slice(tensor: Tensor, axis: usize, index: usize) -> Tensor {
-    Tensor::from_input(Slice::new(tensor, axis, index))
+pub fn slice(tensor: Tensor, axis: usize, indices: Range<usize>) -> Tensor {
+    Tensor::from_input(SliceAxis::new(tensor, axis, indices))
 }
 
 pub fn split(tensor: Tensor, axis: usize) -> Vec<Tensor> {
     let shape = tensor.shape();
     let mut result = Vec::new();
     for i in 0..shape[axis] {
-        result.push(slice(tensor.clone(), axis, i));
+        result.push(slice(tensor.clone(), axis, i..i + 1));
     }
     result
 }
@@ -69,4 +72,8 @@ pub fn std(input: Tensor, input_mean: Tensor) -> Tensor {
     let input_var = var(input.clone(), input_mean);
     let exp = Tensor::scalar(0.5).no_grad();
     pow(input_var, exp)
+}
+
+pub fn debugger(tensor: Tensor, marker: usize) -> Tensor {
+    Tensor::from_input(Debugger::new(tensor, marker))
 }

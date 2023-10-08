@@ -1,6 +1,5 @@
 use std::vec;
 
-use hashbrown::HashMap;
 use nekonet::{
     data_util::{DataLoader, Dataset},
     graph::Graph,
@@ -10,7 +9,8 @@ use nekonet::{
         Layer,
     },
     optimizer::{self, Optimizer},
-    tensor::{types::Data, Tensor},
+    prelude::RawData,
+    tensor::Tensor,
 };
 
 fn main() {
@@ -33,7 +33,7 @@ fn main() {
     let dataset = MyDataset::new();
     let dataloader = DataLoader::new(&dataset, 20, true);
 
-    for _ in 0..50 {
+    for _ in 0..10 {
         for (input_batch, target_batch) in dataloader.iter() {
             input_placeholder.set_data(input_batch.clone());
             target_placeholder.set_data(target_batch.clone());
@@ -42,7 +42,7 @@ fn main() {
             graph.zero_grad();
             graph.backward();
 
-            dbg!(&loss);
+            dbg!(loss.data().borrow()[0]);
 
             optimizer.step();
         }
@@ -62,7 +62,7 @@ fn main() {
     let gragh = Graph::from_output(loss.clone());
     gragh.forward();
 
-    dbg!(loss);
+    dbg!(loss.data().borrow()[0]);
 }
 
 struct Bp {
@@ -103,8 +103,7 @@ impl Bp {
         let out = self.fc2.output(out.clone());
         let out = self.relu.output(out.clone());
         let out = self.fc3.output(out.clone());
-        let pred = self.softmax.output(out.clone());
-        pred
+        self.softmax.output(out.clone())
     }
 
     fn loss(&self, pred: Tensor, target: Tensor) -> Tensor {
@@ -121,8 +120,8 @@ impl Bp {
 }
 
 struct MyDataset {
-    input_data: Vec<Data>,
-    target_data: Vec<Data>,
+    input_data: Vec<RawData>,
+    target_data: Vec<RawData>,
 }
 
 impl MyDataset {
@@ -151,7 +150,7 @@ impl Dataset for MyDataset {
         self.input_data.len()
     }
 
-    fn get(&self, index: usize) -> (Data, Data) {
+    fn get(&self, index: usize) -> (RawData, RawData) {
         (
             self.input_data[index].clone(),
             self.target_data[index].clone(),

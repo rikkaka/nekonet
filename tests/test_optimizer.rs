@@ -26,14 +26,14 @@ fn test_sgd() {
     sgd.add_params(vec![x2.clone(), y2.clone()]);
     sgd.step();
 
-    assert_eq!(z.data().borrow().as_slice(), &[8., 12., 16., 24.]);
-    assert_eq!(x2.data().borrow().as_slice(), &[0.96, 1.96, 2.94, 3.94]);
-    assert_eq!(y2.data().borrow().as_slice(), &[0.99, 1.99, 0.99, 1.99]);
+    assert_eq!(z.raw_data().as_slice(), &[8., 12., 16., 24.]);
+    assert_eq!(x2.raw_data().as_slice(), &[0.96, 1.96, 2.94, 3.94]);
+    assert_eq!(y2.raw_data().as_slice(), &[0.99, 1.99, 0.99, 1.99]);
 
     graph.forward();
-    assert_eq!(z.data().borrow().as_slice(), &[7.83, 11.83, 15.63, 23.63]);
+    assert_eq!(z.raw_data().as_slice(), &[7.83, 11.83, 15.63, 23.63]);
 
-    let mut last_data = z.data().borrow().clone();
+    let mut last_data = z.raw_data();
     for _ in 0..10 {
         graph.zero_grad();
         graph.backward();
@@ -41,7 +41,7 @@ fn test_sgd() {
         sgd.step();
 
         graph.forward();
-        let now_data = z.data().borrow().clone();
+        let now_data = z.raw_data();
         assert!(now_data < last_data);
         last_data = now_data;
     }

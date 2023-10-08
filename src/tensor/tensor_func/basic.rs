@@ -1,11 +1,18 @@
-use crate::tensor::{types::*, util::IndexCalculator, Tensor};
+use std::ops::Range;
+
+use ndarray::{ArrayD, Axis, Zip};
+
+use crate::{
+    into_2d,
+    tensor::{types::*, Tensor},
+};
 
 use super::TensorFunc;
 
 pub struct Add(Tensor, Tensor);
 pub struct Opposite(Tensor);
 pub struct Reciprocal(Tensor);
-pub struct ScalarMul {
+pub struct MulScalar {
     tensor: Tensor,
     scalar: Tensor,
 }
@@ -16,20 +23,18 @@ pub struct Pow {
 pub struct Ln(Tensor);
 pub struct MatMul(Tensor, Tensor);
 
-pub struct Slice {
+pub struct SliceAxis {
     input: Tensor,
 
     axis: usize,
 
-    indexs: Vec<usize>,
+    indices: Range<usize>,
 }
 
 pub struct Concat {
     inputs: Vec<Tensor>,
 
-    indexss: Vec<Vec<usize>>,
-
-    output_shape: Shape,
+    axis: usize,
 }
 
 pub struct Sum {
@@ -65,15 +70,15 @@ impl Reciprocal {
     }
 }
 
-impl ScalarMul {
-    pub fn new(tensor: Tensor, scalar: Tensor) -> ScalarMul {
+impl MulScalar {
+    pub fn new(tensor: Tensor, scalar: Tensor) -> MulScalar {
         assert_eq!(
             scalar.shape(),
             vec![1],
             "scalar should be a scalar, but got shape: {:?}",
             scalar.shape()
         );
-        ScalarMul { scalar, tensor }
+        MulScalar { scalar, tensor }
     }
 }
 
@@ -111,26 +116,20 @@ impl TensorFunc for Add {
     }
 
     fn cal_output_data(&self) -> Data {
-        let left = &self.0.data().borrow();
-        let right = &self.1.data().borrow();
-        left.iter().zip(right.iter()).map(|(l, r)| l + r).collect()
+        let left = &self.0.data().borrow().to_owned();
+        let right = &self.1.data().borrow().to_owned();
+        left + right
     }
 
     fn renew_grad(&self, _output_data: &Data, output_grad: &Grad) {
         if self.0.is_require_grad() {
-            let mut left_grad = self.0.grad().unwrap().borrow_mut();
-            for i in 0..output_grad.len() {
-                left_grad[i] += output_grad[i];
-            }
-            drop(left_grad);
+            let mut input_grad = self.0.grad().unwrap().borrow_mut();
+            input_grad.zip_mut_with(output_grad, |x, y| *x += y);
         }
 
         if self.1.is_require_grad() {
-            let mut right_grad = self.1.grad().unwrap().borrow_mut();
-            for i in 0..output_grad.len() {
-                right_grad[i] += output_grad[i];
-            }
-            drop(right_grad);
+            let mut input_grad = self.1.grad().unwrap().borrow_mut();
+            input_grad.zip_mut_with(output_grad, |x, y| *x += y);
         }
     }
 
@@ -145,16 +144,13 @@ impl TensorFunc for Opposite {
     }
 
     fn cal_output_data(&self) -> Data {
-        let input = &self.0.data().borrow();
-        input.iter().map(|x| -x).collect()
+        let input = &self.0.data().borrow().to_owned();
+        -input
     }
 
     fn renew_grad(&self, _output_data: &Data, output_grad: &Grad) {
         let mut input_grad = self.0.grad().unwrap().borrow_mut();
-        for i in 0..output_grad.len() {
-            input_grad[i] += -output_grad[i];
-        }
-        drop(input_grad);
+        input_grad.zip_mut_with(output_grad, |x, y| *x += -y);
     }
 
     fn tensors(&self) -> Vec<Tensor> {
@@ -169,17 +165,16 @@ impl TensorFunc for Reciprocal {
 
     fn cal_output_data(&self) -> Data {
         let input = &self.0.data().borrow();
-        input.iter().map(|x| 1.0 / x).collect()
+        input.mapv(|x| x.recip())
     }
 
     fn renew_grad(&self, _output_data: &Data, output_grad: &Grad) {
         let mut input_grad = self.0.grad().unwrap().borrow_mut();
-
-        for i in 0..output_grad.len() {
-            input_grad[i] +=
-                -output_grad[i] / (self.0.data().borrow()[i] * self.0.data().borrow()[i]);
-        }
-        drop(input_grad);
+        let input = &self.0.data().borrow();
+        ndarray::Zip::from(input_grad.view_mut())
+            .and(input.view())
+            .and(output_grad)
+            .for_each(|x, y, z| *x += -z * y.recip().powf(2.));
     }
 
     fn tensors(&self) -> Vec<Tensor> {
@@ -187,7 +182,7 @@ impl TensorFunc for Reciprocal {
     }
 }
 
-impl TensorFunc for ScalarMul {
+impl TensorFunc for MulScalar {
     fn output_shape(&self) -> Shape {
         self.tensor.shape().clone()
     }
@@ -195,28 +190,24 @@ impl TensorFunc for ScalarMul {
     fn cal_output_data(&self) -> Data {
         let scalar = &self.scalar.data().borrow()[0];
         let tensor = &self.tensor.data().borrow();
-        tensor.iter().map(|x| x * scalar).collect()
+        tensor.mapv(|x| x * scalar)
     }
 
     fn renew_grad(&self, _output_data: &Data, output_grad: &Grad) {
         if self.scalar.is_require_grad() {
             let mut scalar_grad = self.scalar.grad().unwrap().borrow_mut();
             let tensor = &self.tensor.data().borrow();
-
-            for i in 0..output_grad.len() {
-                scalar_grad[0] += output_grad[i] * tensor[i];
-            }
-            drop(scalar_grad);
+            ndarray::Zip::from(tensor.view())
+                .and(output_grad)
+                .for_each(|y, z| scalar_grad[0] += z * y);
         }
 
         if self.tensor.is_require_grad() {
             let mut tensor_grad = self.tensor.grad().unwrap().borrow_mut();
             let scalar = &self.scalar.data().borrow()[0];
-
-            for i in 0..output_grad.len() {
-                tensor_grad[i] += output_grad[i] * scalar;
-            }
-            drop(tensor_grad);
+            ndarray::Zip::from(tensor_grad.view_mut())
+                .and(output_grad)
+                .for_each(|x, y| *x += y * scalar);
         }
     }
 
@@ -231,35 +222,33 @@ impl TensorFunc for Pow {
     }
 
     fn cal_output_data(&self) -> Data {
-        let base = &self.base.data().borrow();
-        let exponent = &self.exponent.data().borrow();
-        base.iter()
-            .zip(exponent.iter())
-            .map(|(b, e)| b.powf(*e))
-            .collect()
+        let base = &self.base.data().borrow().to_owned();
+        let exponent = &self.exponent.data().borrow().to_owned();
+        Zip::from(base.view())
+            .and(exponent.view())
+            .map_collect(|x, y| x.powf(*y))
     }
 
     fn renew_grad(&self, _output_data: &Data, output_grad: &Grad) {
+        let base = &self.base.data().borrow();
+        let exponent = &self.exponent.data().borrow();
+
         if self.base.is_require_grad() {
             let mut base_grad = self.base.grad().unwrap().borrow_mut();
-            let base = &self.base.data().borrow();
-            let exponent = &self.exponent.data().borrow();
-
-            for i in 0..output_grad.len() {
-                base_grad[i] += output_grad[i] * exponent[i] * base[i].powf(exponent[i] - 1.0);
-            }
-            drop(base_grad);
+            ndarray::Zip::from(base_grad.view_mut())
+                .and(base.view())
+                .and(exponent.view())
+                .and(output_grad)
+                .for_each(|x, y, z, w| *x += w * z * y.powf(z - 1.));
         }
 
         if self.exponent.is_require_grad() {
             let mut exponent_grad = self.exponent.grad().unwrap().borrow_mut();
-            let base = &self.base.data().borrow();
-            let exponent = &self.exponent.data().borrow();
-
-            for i in 0..output_grad.len() {
-                exponent_grad[i] += output_grad[i] * base[i].ln() * base[i].powf(exponent[i]);
-            }
-            drop(exponent_grad);
+            ndarray::Zip::from(exponent_grad.view_mut())
+                .and(base.view())
+                .and(exponent.view())
+                .and(output_grad)
+                .for_each(|x, y, z, w| *x += w * y.powf(*z) * y.ln());
         }
     }
 
@@ -275,15 +264,16 @@ impl TensorFunc for Ln {
 
     fn cal_output_data(&self) -> Data {
         let input = &self.0.data().borrow();
-        input.iter().map(|x| x.ln()).collect()
+        input.mapv(|x| x.ln())
     }
 
     fn renew_grad(&self, _output_data: &Data, output_grad: &Grad) {
         let mut input_grad = self.0.grad().unwrap().borrow_mut();
-        for i in 0..output_grad.len() {
-            input_grad[i] += output_grad[i] / self.0.data().borrow()[i];
-        }
-        drop(input_grad);
+        let input = &self.0.data().borrow();
+        ndarray::Zip::from(input_grad.view_mut())
+            .and(input.view())
+            .and(output_grad)
+            .for_each(|x, y, z| *x += z / y);
     }
 
     fn tensors(&self) -> Vec<Tensor> {
@@ -297,38 +287,29 @@ impl TensorFunc for MatMul {
     }
 
     fn cal_output_data(&self) -> Data {
-        let left = &self.0.data().borrow();
-        let right = &self.1.data().borrow();
-        let mut output = Vec::new();
-        output.resize(self.output_shape().iter().product(), 0.0);
-
-        let left_shape = self.0.shape();
-        let right_shape = self.1.shape();
-
-        matmul(left, &left_shape, right, &right_shape)
+        let left_data = self.0.data().borrow();
+        let right_data = self.1.data().borrow();
+        let (left, right) = into_2d!(left_data.view(), right_data.view());
+        left.dot(&right).into_dyn()
     }
 
     fn renew_grad(&self, _output_data: &Data, output_grad: &Grad) {
+        let (output_grad, left, right) = into_2d!(
+            output_grad.view(),
+            self.0.data().borrow().clone(),
+            self.1.data().borrow().clone()
+        );
+
         if self.0.is_require_grad() {
             let mut left_grad = self.0.grad().unwrap().borrow_mut();
-            let right = &self.1.data().borrow();
-
-            let right_shape = self.1.shape();
-
-            let (right_t, right_t_shape) = transpose(right, &right_shape);
-            *left_grad = matmul(output_grad, &self.output_shape(), &right_t, &right_t_shape);
-            drop(left_grad);
+            let adder = output_grad.dot(&right.t());
+            *left_grad = left_grad.to_owned() + adder;
         }
 
         if self.1.is_require_grad() {
             let mut right_grad = self.1.grad().unwrap().borrow_mut();
-            let left = &self.0.data().borrow();
-
-            let left_shape = self.0.shape();
-
-            let (left_t, left_t_shape) = transpose(left, &left_shape);
-            *right_grad = matmul(&left_t, &left_t_shape, output_grad, &self.output_shape());
-            drop(right_grad);
+            let adder = left.t().dot(&output_grad);
+            *right_grad = right_grad.to_owned() + adder;
         }
     }
 
@@ -337,58 +318,25 @@ impl TensorFunc for MatMul {
     }
 }
 
-fn matmul(left: &Data, left_shape: &Shape, right: &Data, right_shape: &Shape) -> Data {
-    let mut output = Vec::new();
-    output.resize(left_shape[0] * right_shape[1], 0.0);
-
-    for i in 0..left_shape[0] {
-        for j in 0..right_shape[1] {
-            for k in 0..left_shape[1] {
-                output[i * right_shape[1] + j] +=
-                    left[i * left_shape[1] + k] * right[k * right_shape[1] + j];
-            }
-        }
-    }
-
-    output
-}
-
-fn transpose(data: &Data, shape: &Shape) -> (Data, Shape) {
-    let mut output = Vec::new();
-    output.resize(shape.iter().product(), 0.0);
-    let output_shape = vec![shape[1], shape[0]];
-
-    for i in 0..shape[0] {
-        for j in 0..shape[1] {
-            output[j * shape[0] + i] = data[i * shape[1] + j];
-        }
-    }
-
-    (output, output_shape)
-}
-
-impl Slice {
-    pub fn new(input: Tensor, axis: usize, index: usize) -> Slice {
+impl SliceAxis {
+    pub fn new(input: Tensor, axis: usize, indices: Range<usize>) -> SliceAxis {
         assert!(axis < input.shape().len(), "axis out of range");
         assert!(
-            index < input.shape()[axis],
+            indices.end <= input.shape()[axis],
             "index out of range, index: {}, shape: {:?}",
-            index,
+            indices.end,
             input.shape()
         );
 
-        let ic = IndexCalculator::new(input.shape().clone());
-        let indexs = ic.cal_slice_indexs(axis, index);
-
-        Slice {
+        SliceAxis {
             input,
             axis,
-            indexs,
+            indices,
         }
     }
 }
 
-impl TensorFunc for Slice {
+impl TensorFunc for SliceAxis {
     fn output_shape(&self) -> Shape {
         let mut output_shape = self.input.shape().clone();
         output_shape[self.axis] = 1;
@@ -396,22 +344,18 @@ impl TensorFunc for Slice {
     }
 
     fn cal_output_data(&self) -> Data {
-        let mut output = Vec::new();
-
-        for &index in &self.indexs {
-            output.push(self.input.data().borrow()[index]);
-        }
-
-        output
+        self.input
+            .data()
+            .borrow()
+            .slice_axis(Axis(self.axis), self.indices.clone().into())
+            .to_owned()
     }
 
     fn renew_grad(&self, _output_data: &Data, output_grad: &Grad) {
         let mut input_grad = self.input.grad().unwrap().borrow_mut();
-
-        for (&index, &grad) in self.indexs.iter().zip(output_grad) {
-            input_grad[index] += grad;
-        }
-        drop(input_grad);
+        input_grad
+            .slice_axis_mut(Axis(self.axis), self.indices.clone().into())
+            .zip_mut_with(output_grad, |x, y| *x += y);
     }
 
     fn tensors(&self) -> Vec<Tensor> {
@@ -421,65 +365,48 @@ impl TensorFunc for Slice {
 
 impl Concat {
     pub fn new(inputs: Vec<Tensor>, axis: usize) -> Concat {
-        assert!(inputs.len() > 0, "inputs should not be empty");
+        assert!(!inputs.is_empty(), "inputs should not be empty");
         assert!(axis < inputs[0].shape().len(), "axis out of range");
 
-        let mut output_shape = inputs[0].shape().clone();
-        output_shape[axis] = 0;
-        for tensor in &inputs {
-            output_shape[axis] += tensor.shape()[axis];
-        }
-
-        let mut indexss = Vec::new();
-        let ic = IndexCalculator::new(output_shape.clone());
-
-        let mut start = 0;
-        for input in inputs.iter() {
-            let mut indexs = Vec::new();
-            for i in 0..input.shape()[axis] {
-                let index = ic.cal_slice_indexs(axis, start + i);
-                indexs.extend(index);
-            }
-            start += input.shape()[axis];
-            indexss.push(indexs);
-        }
-
-        Concat {
-            inputs,
-            indexss,
-            output_shape,
-        }
+        Concat { inputs, axis }
     }
 }
 
 impl TensorFunc for Concat {
     fn output_shape(&self) -> Shape {
-        self.output_shape.clone()
+        let mut output_shape = self.inputs[0].shape().clone();
+        output_shape[self.axis] = 0;
+        for tensor in &self.inputs {
+            output_shape[self.axis] += tensor.shape()[self.axis];
+        }
+        output_shape
     }
 
     fn cal_output_data(&self) -> Data {
-        let mut output = Vec::new();
-        output.resize(self.output_shape.iter().product(), 0.0);
+        let mut input_iter = self.inputs.iter().map(|x| x.data().borrow());
+        let input0 = input_iter.next().unwrap();
+        let mut output = input0.clone();
 
-        for (indexs, input) in self.indexss.iter().zip(self.inputs.iter()) {
-            let data = input.data().borrow();
-            for (&index, &d) in indexs.iter().zip(data.iter()) {
-                output[index] = d;
-            }
+        for input in input_iter {
+            output.append(Axis(self.axis), input.view()).unwrap();
         }
 
         output
     }
 
     fn renew_grad(&self, _output_data: &Data, output_grad: &Grad) {
-        for (indexs, input) in self.indexss.iter().zip(self.inputs.iter()) {
+        let mut start = 0;
+        for input in self.inputs.iter() {
+            let input_shape = input.shape();
+            let end = start + input_shape[self.axis];
+
             if input.is_require_grad() {
                 let mut input_grad = input.grad().unwrap().borrow_mut();
-                for (ig, index) in input_grad.iter_mut().zip(indexs.iter()) {
-                    *ig = output_grad[*index];
-                }
-                drop(input_grad);
+                let adder = output_grad.slice_axis(Axis(self.axis), (start..end).into());
+                *input_grad = input_grad.to_owned() + adder
             }
+
+            start = end;
         }
     }
 
@@ -500,20 +427,13 @@ impl TensorFunc for Sum {
     }
 
     fn cal_output_data(&self) -> Data {
-        let input = &self.input.data().borrow();
-        let mut sum = 0.0;
-        for i in 0..input.len() {
-            sum += input[i];
-        }
-        vec![sum]
+        let output_data = self.input.data().borrow().sum();
+        ArrayD::from_elem(vec![1], output_data)
     }
 
     fn renew_grad(&self, _output_data: &Data, output_grad: &Grad) {
         let mut input_grad = self.input.grad().unwrap().borrow_mut();
-        for i in 0..input_grad.len() {
-            input_grad[i] += output_grad[0];
-        }
-        drop(input_grad);
+        input_grad.mapv_inplace(|x| x + output_grad[0]);
     }
 
     fn tensors(&self) -> Vec<Tensor> {
@@ -533,20 +453,53 @@ impl TensorFunc for Mean {
     }
 
     fn cal_output_data(&self) -> Data {
-        let input = &self.input.data().borrow();
-        let mut sum = 0.0;
-        for i in 0..input.len() {
-            sum += input[i];
-        }
-        vec![sum / input.len() as f32]
+        let output_data = self.input.data().borrow().mean().unwrap();
+        ArrayD::from_elem(vec![1], output_data)
     }
 
     fn renew_grad(&self, _output_data: &Data, output_grad: &Grad) {
         let mut input_grad = self.input.grad().unwrap().borrow_mut();
-        for i in 0..input_grad.len() {
-            input_grad[i] += output_grad[0] / input_grad.len() as f32;
+        let numbers = input_grad.len() as f32;
+        input_grad.mapv_inplace(|x| x + output_grad[0] / numbers);
+    }
+
+    fn tensors(&self) -> Vec<Tensor> {
+        vec![self.input.clone()]
+    }
+}
+
+pub struct Debugger {
+    input: Tensor,
+    marker: usize,
+}
+
+impl Debugger {
+    pub fn new(tensor: Tensor, marker: usize) -> Debugger {
+        Debugger {
+            input: tensor,
+            marker,
         }
-        drop(input_grad);
+    }
+}
+
+impl TensorFunc for Debugger {
+    fn output_shape(&self) -> Shape {
+        self.input.shape().clone()
+    }
+
+    fn cal_output_data(&self) -> Data {
+        let data = self.input.data().borrow();
+        if data.iter().any(|x| x.is_nan()) {
+            println!("{:?}", self.marker);
+            panic!("NaN detected");
+        } else {
+            data.clone()
+        }
+    }
+
+    fn renew_grad(&self, _output_data: &Data, output_grad: &Grad) {
+        let mut input_grad = self.input.grad().unwrap().borrow_mut();
+        input_grad.zip_mut_with(output_grad, |x, y| *x += y);
     }
 
     fn tensors(&self) -> Vec<Tensor> {

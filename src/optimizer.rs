@@ -39,10 +39,7 @@ impl Optimizer for SGD {
         for param in &self.params {
             let mut data = param.data().borrow_mut();
             let grad = param.grad().unwrap().borrow();
-            for i in 0..data.len() {
-                data[i] -= self.lr * grad[i];
-            }
-            drop(data);
+            *data = data.clone() - self.lr * grad.clone();
         }
     }
 }

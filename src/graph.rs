@@ -1,8 +1,6 @@
-use crate::{
-    layer::Layer,
-    tensor::{self, Tensor},
-};
+use crate::tensor::{self, Tensor};
 
+#[derive(Default)]
 pub struct Builder {
     outputs: Vec<Tensor>,
 }

@@ -1,6 +1,9 @@
 use nekonet::{
     graph::Graph,
-    tensor::{operation, Tensor},
+    tensor::{
+        operation::{self, sum},
+        Tensor,
+    },
 };
 
 #[test]
@@ -18,9 +21,9 @@ fn test_add() {
     graph.forward();
     graph.backward();
 
-    assert_eq!(z.data().borrow().as_slice(), &[4., 8., 12., 16.]);
-    assert_eq!(y1.grad().unwrap().borrow().as_slice(), &[1., 1., 1., 1.]);
-    assert_eq!(x1.grad().unwrap().borrow().as_slice(), &[4., 4., 4., 4.]);
+    assert_eq!(z.raw_data().as_slice(), &[4., 8., 12., 16.]);
+    assert_eq!(y1.raw_grad().unwrap().as_slice(), &[1., 1., 1., 1.]);
+    assert_eq!(x1.raw_grad().unwrap().as_slice(), &[4., 4., 4., 4.]);
 }
 
 #[test]
@@ -36,11 +39,8 @@ fn test_opposite() {
     graph.zero_grad();
     graph.backward();
 
-    assert_eq!(y.data().borrow().as_slice(), &[-1., -2., -3., -4.]);
-    assert_eq!(
-        x1.grad().unwrap().borrow().as_slice(),
-        &[-1., -1., -1., -1.]
-    );
+    assert_eq!(y.raw_data().as_slice(), &[-1., -2., -3., -4.]);
+    assert_eq!(x1.raw_grad().unwrap().as_slice(), &[-1., -1., -1., -1.]);
 }
 
 #[test]
@@ -56,10 +56,10 @@ fn test_reciprol() {
     graph.zero_grad();
     graph.backward();
 
-    assert_eq!(y.data().borrow().as_slice(), &[1., 0.5, 0.33333334, 0.25]);
+    assert_eq!(y.raw_data().as_slice(), &[1., 0.5, 0.33333334, 0.25]);
     assert_eq!(
-        x1.grad().unwrap().borrow().as_slice(),
-        &[-1., -0.25, -0.11111111, -0.0625]
+        x1.raw_grad().unwrap().as_slice(),
+        &[-1., -0.25, -0.11111112, -0.0625]
     );
 }
 
@@ -77,9 +77,9 @@ fn test_scalar_mul() {
     graph.forward();
     graph.backward();
 
-    assert_eq!(y.data().borrow().as_slice(), &[2., 4., 6., 8.]);
-    assert_eq!(x.grad().unwrap().borrow().as_slice(), &[2., 2., 2., 2.]);
-    assert_eq!(c.grad().unwrap().borrow().as_slice(), &[10.]);
+    assert_eq!(y.raw_data().as_slice(), &[2., 4., 6., 8.]);
+    assert_eq!(x.raw_grad().unwrap().as_slice(), &[2., 2., 2., 2.]);
+    assert_eq!(c.raw_grad().unwrap().as_slice(), &[10.]);
 }
 
 #[test]
@@ -94,9 +94,9 @@ fn test_pow() {
     graph.forward();
     graph.backward();
 
-    assert_eq!(y.data().borrow().as_slice(), &[1., 4., 27., 256.]);
+    assert_eq!(y.raw_data().as_slice(), &[1., 4., 27., 256.]);
     assert_eq!(
-        x1.grad().unwrap().borrow().as_slice(),
+        x1.raw_grad().unwrap().as_slice(),
         &[
             1.,
             4. * (1. + 2_f32.ln()),
@@ -119,11 +119,11 @@ fn test_ln() {
     graph.backward();
 
     assert_eq!(
-        y.data().borrow().as_slice(),
+        y.raw_data().as_slice(),
         &[0., 2_f32.ln(), 3_f32.ln(), 4_f32.ln()]
     );
     assert_eq!(
-        x1.grad().unwrap().borrow().as_slice(),
+        x1.raw_grad().unwrap().as_slice(),
         &[1., 1. / 2., 1. / 3., 1. / 4.]
     );
 }
@@ -141,15 +141,12 @@ fn test_matmul() {
     graph.forward();
     graph.backward();
 
-    assert_eq!(c.data().borrow().as_slice(), &[22., 28., 49., 64.]);
+    assert_eq!(c.raw_data().as_slice(), &[22., 28., 49., 64.]);
     assert_eq!(
-        a.grad().unwrap().borrow().as_slice(),
+        a.raw_grad().unwrap().as_slice(),
         &[3., 7., 11., 3., 7., 11.]
     );
-    assert_eq!(
-        b.grad().unwrap().borrow().as_slice(),
-        &[5., 5., 7., 7., 9., 9.]
-    );
+    assert_eq!(b.raw_grad().unwrap().as_slice(), &[5., 5., 7., 7., 9., 9.]);
 }
 
 #[test]
@@ -165,10 +162,10 @@ fn test_concat() {
     graph.forward();
     graph.backward();
 
-    assert_eq!(c.data().borrow().as_slice(), &[1., 2., 1., 2., 3., 4.]);
+    assert_eq!(c.raw_data().as_slice(), &[1., 2., 1., 2., 3., 4.]);
     assert_eq!(c.shape().as_slice(), &[3, 2]);
-    assert_eq!(a.grad().unwrap().borrow().as_slice(), &[1., 1.]);
-    assert_eq!(b.grad().unwrap().borrow().as_slice(), &[1., 1., 1., 1.]);
+    assert_eq!(a.raw_grad().unwrap().as_slice(), &[1., 1.]);
+    assert_eq!(b.raw_grad().unwrap().as_slice(), &[1., 1., 1., 1.]);
 }
 
 #[test]
@@ -185,10 +182,10 @@ fn test_split() {
     graph.forward();
     graph.backward();
 
-    assert_eq!(b.data().borrow().as_slice(), &[1., 2., 3., 4.]);
-    assert_eq!(c.data().borrow().as_slice(), &[1., 2., 3., 4.]);
+    assert_eq!(b.raw_data().as_slice(), &[1., 2., 3., 4.]);
+    assert_eq!(c.raw_data().as_slice(), &[1., 2., 3., 4.]);
     assert_eq!(
-        a.grad().unwrap().borrow().as_slice(),
+        a.raw_grad().unwrap().as_slice(),
         &[1., 1., 1., 1., 1., 1., 1., 1.]
     );
     assert_eq!(b.shape().as_slice(), &[1, 4]);
@@ -206,12 +203,44 @@ fn test_split() {
     graph.forward();
     graph.backward();
 
-    assert_eq!(b.data().borrow().as_slice(), &[1., 1.]);
-    assert_eq!(c.data().borrow().as_slice(), &[2., 2.]);
+    assert_eq!(b.raw_data().as_slice(), &[1., 1.]);
+    assert_eq!(c.raw_data().as_slice(), &[2., 2.]);
     assert_eq!(
-        a.grad().unwrap().borrow().as_slice(),
+        a.raw_grad().unwrap().as_slice(),
         &[1., 1., 0., 0., 1., 1., 0., 0.]
     );
     assert_eq!(b.shape().as_slice(), &[2, 1]);
     assert_eq!(c.shape().as_slice(), &[2, 1]);
+}
+
+#[test]
+fn test_sum() {
+    let a = Tensor::new(vec![1., 2., 3., 4.], vec![1, 4]);
+
+    let output = sum(a.clone());
+
+    let graph = Graph::from_output(output.clone());
+    graph.init_grad();
+
+    graph.forward();
+    graph.backward();
+
+    assert_eq!(output.raw_data().as_slice(), &[10.]);
+    assert_eq!(a.raw_grad().unwrap().as_slice(), &[1., 1., 1., 1.]);
+}
+
+#[test]
+fn test_mean() {
+    let a = Tensor::new(vec![1., 2., 3., 4.], vec![1, 4]);
+
+    let output = operation::mean(a.clone());
+
+    let graph = Graph::from_output(output.clone());
+    graph.init_grad();
+
+    graph.forward();
+    graph.backward();
+
+    assert_eq!(output.raw_data().as_slice(), &[2.5]);
+    assert_eq!(a.raw_grad().unwrap().as_slice(), &[0.25, 0.25, 0.25, 0.25]);
 }

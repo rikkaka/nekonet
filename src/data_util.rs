@@ -1,10 +1,13 @@
 use rand::seq::SliceRandom;
 
-use crate::tensor::types::Data;
+use crate::tensor::types::RawData;
 
 pub trait Dataset {
     fn len(&self) -> usize;
-    fn get(&self, index: usize) -> (Data, Data);
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+    fn get(&self, index: usize) -> (RawData, RawData);
 }
 
 pub struct DataLoader<'a, D: Dataset> {
@@ -43,7 +46,7 @@ pub struct DataLoaderIter<'a, 'b, D: Dataset> {
 }
 
 impl<'a, 'b, D: Dataset> Iterator for DataLoaderIter<'a, 'b, D> {
-    type Item = (Data, Data);
+    type Item = (Vec<f32>, Vec<f32>);
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut batch_input = Vec::new();

@@ -1,5 +1,7 @@
+use ndarray::{Array2, ArrayD, Zip};
+
 use super::{Tensor, TensorFunc};
-use crate::tensor::types::*;
+use crate::{into_2d, tensor::types::*};
 pub struct ReLU(Tensor);
 pub struct Softmax(Tensor);
 
@@ -27,17 +29,17 @@ impl TensorFunc for ReLU {
 
     fn cal_output_data(&self) -> Data {
         let input = &self.0.data().borrow();
-        input.iter().map(|x| x.max(0.0)).collect()
+        input.mapv(|x| if x > 0.0 { x } else { 0.0 })
     }
 
     fn renew_grad(&self, _output_data: &Data, output_grad: &Grad) {
         let mut input_grad = self.0.grad().unwrap().borrow_mut();
         let input = &self.0.data().borrow();
 
-        for i in 0..output_grad.len() {
-            input_grad[i] += output_grad[i] * if input[i] > 0.0 { 1.0 } else { 0.0 };
-        }
-        drop(input_grad);
+        Zip::from(&mut input_grad.view_mut())
+            .and(input.view())
+            .and(output_grad.view())
+            .for_each(|x, y, z| *x += if *y > 0.0 { *z } else { 0.0 })
     }
 
     fn tensors(&self) -> Vec<Tensor> {
@@ -52,32 +54,37 @@ impl TensorFunc for Softmax {
 
     fn cal_output_data(&self) -> Data {
         let input = &self.0.data().borrow();
-        let mut output = Vec::new();
-        let mut sum = 0.0;
-        for i in 0..input.len() {
-            sum += input[i].exp();
-        }
-        for i in 0..input.len() {
-            output.push(input[i].exp() / sum);
-        }
-        output
+        // let input = input.to_owned();
+        let max_val = input.iter().fold(f32::MIN, |x, &y| x.max(y));
+        let input = input.mapv(|x| x - max_val);
+        let output = input.mapv(|x| {
+            let x = x.exp();
+            if x.is_infinite() {
+                panic!("123")
+            } else {
+                x
+            }
+        });
+        let sum = output.sum();
+        output.mapv(|x| x / sum)
     }
 
     fn renew_grad(&self, output_data: &Data, output_grad: &Grad) {
-        let mut input_grad = self.0.grad().unwrap().borrow_mut();
-
-        for i in 0..output_grad.len() {
-            let mut sum = 0.0;
-            for j in 0..output_grad.len() {
-                if i == j {
-                    sum += output_grad[j] * output_data[i] * (1.0 - output_data[i]);
-                } else {
-                    sum -= output_grad[j] * output_data[i] * output_data[j];
-                }
+        let n = output_data.len();
+        let output_data_slice = output_data.as_slice().unwrap();
+        let jacobian: Array2<f32> = Array2::from_shape_fn((n, n), |(i, j)| {
+            if i == j {
+                output_data_slice[i] * (1.0 - output_data_slice[i])
+            } else {
+                -output_data_slice[i] * output_data_slice[j]
             }
-            input_grad[i] += sum;
-        }
-        drop(input_grad);
+        });
+
+        let mut input_grad = self.0.grad().unwrap().borrow_mut();
+        let output_grad = into_2d!(output_grad.view()).0;
+
+        let adder = output_grad.dot(&jacobian);
+        input_grad.zip_mut_with(&adder, |x, y| *x += *y);
     }
 
     fn tensors(&self) -> Vec<Tensor> {
@@ -97,37 +104,32 @@ impl TensorFunc for CrossEntropy {
         vec![1]
     }
 
-    fn cal_output_data(&self) -> super::Data {
+    fn cal_output_data(&self) -> Data {
         let input = &self.input.data().borrow();
         let target = &self.target.data().borrow();
 
-        let mut output = 0.0;
-        for i in 0..input.len() {
-            output += -target[i] * (input[i] + 1e-10).ln();
-        }
-        vec![output]
+        let output = Zip::from(input.view())
+            .and(target.view())
+            .map_collect(|x, y| -y * (x + 1e-20).ln())
+            .sum();
+        ArrayD::from_elem(vec![1], output)
     }
 
-    fn renew_grad(&self, _output_data: &Data, output_grad: &Grad) {
+    fn renew_grad(&self, _output_data: &Data, _output_grad: &Grad) {
+        let input = &self.input.data().borrow();
+        let target = &self.target.data().borrow();
+
         if self.input.is_require_grad() {
             let mut input_grad = self.input.grad().unwrap().borrow_mut();
-            let input = &self.input.data().borrow();
-            let target = &self.target.data().borrow();
 
-            for i in 0..input.len() {
-                input_grad[i] += -target[i] / (input[i] + 1e-10) * output_grad[0];
-            }
-            drop(input_grad);
+            Zip::from(input_grad.view_mut())
+                .and(input.view())
+                .and(target.view())
+                .for_each(|g, p, y| *g += -y / (p + 1e-20))
         }
 
         if self.target.is_require_grad() {
-            let mut target_grad = self.target.grad().unwrap().borrow_mut();
-            let input = &self.input.data().borrow();
-
-            for i in 0..input.len() {
-                target_grad[i] += -input[i].ln() * output_grad[0];
-            }
-            drop(target_grad);
+            unimplemented!()
         }
     }
 
