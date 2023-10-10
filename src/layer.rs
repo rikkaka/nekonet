@@ -13,7 +13,6 @@ pub trait Layer {
     fn leaf_tensors(&self) -> Vec<Tensor> {
         Vec::new()
     }
-    // fn outputs(&self, input: Vec<Tensor>) -> Vec<Tensor>;
 }
 
 #[derive(Clone, Debug)]

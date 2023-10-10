@@ -303,15 +303,23 @@ impl TensorFunc for MatMul {
         if self.0.is_require_grad() {
             let mut left_grad = self.0.grad().unwrap().borrow_mut();
             let adder = output_grad.dot(&right.t());
-            *left_grad = left_grad.to_owned() + adder;
-            // left_grad.zip_mut_with(&adder, |x, y| *x += y);
+
+            // Zip::from(left_grad.view_mut())
+            //     .and(adder.into_dyn().view())
+            //     .par_for_each(|x, y| *x += y);
+
+            left_grad.zip_mut_with(&adder, |x, y| *x += y);
         }
 
         if self.1.is_require_grad() {
             let mut right_grad = self.1.grad().unwrap().borrow_mut();
             let adder = left.t().dot(&output_grad);
-            *right_grad = right_grad.to_owned() + adder;
-            // right_grad.zip_mut_with(&adder, |x, y| *x += y);
+
+            // Zip::from(right_grad.view_mut())
+            //     .and(adder.into_dyn().view())
+            //     .par_for_each(|x, y| *x += y);
+
+            right_grad.zip_mut_with(&adder, |x, y| *x += y);
         }
     }
 

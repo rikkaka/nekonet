@@ -120,9 +120,9 @@ struct Bp {
 
 impl Bp {
     fn new() -> Self {
-        let fc1 = Linear::new(784, 100);
-        let fc2 = Linear::new(100, 10);
-        let fc3 = Linear::new(10, 10);
+        let fc1 = Linear::new(784, 250);
+        let fc2 = Linear::new(250, 30);
+        let fc3 = Linear::new(30, 10);
 
         let relu = ReLU();
         let softmax = Softmax();
