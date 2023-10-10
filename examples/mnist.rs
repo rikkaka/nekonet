@@ -47,7 +47,8 @@ fn main() {
 
     let gragh_test = Graph::from_output(loss_test.clone());
 
-    dbg!(&now.elapsed().as_millis());
+    let mut timer1 = 0;
+    let mut timer2 = 0;
 
     for i in 0..EPOCH {
         for (input_batch, target_batch) in dataloader_train.iter() {
@@ -59,12 +60,12 @@ fn main() {
             graph_train.forward();
             graph_train.zero_grad();
 
-            dbg!(now.elapsed().as_micros());
+            timer1 += now.elapsed().as_micros();
             let now = std::time::Instant::now();
 
             graph_train.backward();
 
-            dbg!(now.elapsed().as_micros());
+            timer2 += now.elapsed().as_micros();
 
             optimizer.step();
         }
@@ -79,6 +80,8 @@ fn main() {
     }
 
     dbg!(&now.elapsed().as_millis());
+    dbg!(timer1);
+    dbg!(timer2);
 }
 
 struct MnistDataset {
