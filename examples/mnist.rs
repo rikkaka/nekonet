@@ -54,11 +54,17 @@ fn main() {
             input_placeholder.set_data(input_batch.clone());
             target_placeholder.set_data(target_batch.clone());
 
+            let now = std::time::Instant::now();
+
             graph_train.forward();
             graph_train.zero_grad();
+
+            dbg!(now.elapsed().as_micros());
+            let now = std::time::Instant::now();
+
             graph_train.backward();
 
-            // assert!(!&loss.data().borrow()[0].is_nan());
+            dbg!(now.elapsed().as_micros());
 
             optimizer.step();
         }
