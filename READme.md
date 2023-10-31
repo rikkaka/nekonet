@@ -1,0 +1,2 @@
+# nekonet
+A basic deep learning framework written in Rust, allowing easy definition of Back-Propagation Network. Based on the static computational graph, this framework has a decent running speed on the CPU. You can see example of mnist dataset at [examples/mnist.rs](examples/mnist.rs). To run the example, you need to download the mnist dataset from [here](http://yann.lecun.com/exdb/mnist/). After downloading, extract the files and put them in a folder named `mnist` in the root of the project. Then run the example with `cargo run --example mnist`.
