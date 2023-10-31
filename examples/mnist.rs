@@ -22,8 +22,6 @@ fn main() {
     let dataset_train = MnistDataset::new(trn_img, trn_lbl);
     let dataset_test = MnistDataset::new(tst_img, tst_lbl.clone());
 
-    let now = std::time::Instant::now();
-
     let dataloader_train = DataLoader::new(&dataset_train, BATCH_SIZE, true);
     let dataloader_test = DataLoader::new(&dataset_test, 10_000, false);
 
@@ -47,25 +45,15 @@ fn main() {
 
     let gragh_test = Graph::from_output(loss_test.clone());
 
-    let mut timer1 = 0;
-    let mut timer2 = 0;
-
     for i in 0..EPOCH {
         for (input_batch, target_batch) in dataloader_train.iter() {
             input_placeholder.set_data(input_batch.clone());
             target_placeholder.set_data(target_batch.clone());
 
-            let now = std::time::Instant::now();
 
             graph_train.forward();
             graph_train.zero_grad();
-
-            timer1 += now.elapsed().as_micros();
-            let now = std::time::Instant::now();
-
             graph_train.backward();
-
-            timer2 += now.elapsed().as_micros();
 
             optimizer.step();
         }
@@ -78,10 +66,6 @@ fn main() {
         let acc = accuracy(&pred_class.into_raw_vec(), &tst_lbl);
         println!("epoch: {}, loss: {}, acc: {}", i, loss_test_data[0], acc);
     }
-
-    dbg!(&now.elapsed().as_millis());
-    dbg!(timer1);
-    dbg!(timer2);
 }
 
 struct MnistDataset {
