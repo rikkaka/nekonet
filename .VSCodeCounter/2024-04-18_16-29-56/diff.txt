@@ -1,0 +1,44 @@
+Date : 2024-04-18 16:29:56
+Directory : /Users/rikka/prjs/nekonet
+Total : 11 files,  14 codes, -23 comments, 6 blanks, all -3 lines
+
+Languages
++----------+------------+------------+------------+------------+------------+
+| language | files      | code       | comment    | blank      | total      |
++----------+------------+------------+------------+------------+------------+
+| Rust     |          9 |         78 |        -23 |         13 |         68 |
+| Markdown |          1 |         -2 |          0 |          0 |         -2 |
+| TOML     |          1 |        -62 |          0 |         -7 |        -69 |
++----------+------------+------------+------------+------------+------------+
+
+Directories
++--------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                         | files      | code       | comment    | blank      | total      |
++--------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                            |         11 |         14 |        -23 |          6 |         -3 |
+| . (Files)                                                    |          2 |        -64 |          0 |         -7 |        -71 |
+| examples                                                     |          1 |          8 |          0 |          5 |         13 |
+| src                                                          |          8 |         70 |        -23 |          8 |         55 |
+| src (Files)                                                  |          4 |         77 |        -16 |         14 |         75 |
+| src/tensor                                                   |          4 |         -7 |         -7 |         -6 |        -20 |
+| src/tensor (Files)                                           |          2 |          6 |          0 |         -1 |          5 |
+| src/tensor/tensor_func                                       |          2 |        -13 |         -7 |         -5 |        -25 |
++--------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++--------------------------------------------------------------+----------+------------+------------+------------+------------+
+| filename                                                     | language | code       | comment    | blank      | total      |
++--------------------------------------------------------------+----------+------------+------------+------------+------------+
+| /Users/rikka/prjs/nekonet/Cargo.lock                         | TOML     |        -62 |          0 |         -7 |        -69 |
+| /Users/rikka/prjs/nekonet/README.md                          | Markdown |         -2 |          0 |          0 |         -2 |
+| /Users/rikka/prjs/nekonet/examples/mnist.rs                  | Rust     |          8 |          0 |          5 |         13 |
+| /Users/rikka/prjs/nekonet/src/graph.rs                       | Rust     |          0 |          1 |          0 |          1 |
+| /Users/rikka/prjs/nekonet/src/layer.rs                       | Rust     |         22 |        -35 |         -3 |        -16 |
+| /Users/rikka/prjs/nekonet/src/optimizer.rs                   | Rust     |          1 |          0 |          2 |          3 |
+| /Users/rikka/prjs/nekonet/src/tensor.rs                      | Rust     |         54 |         18 |         15 |         87 |
+| /Users/rikka/prjs/nekonet/src/tensor/tensor_func.rs          | Rust     |          4 |          0 |          0 |          4 |
+| /Users/rikka/prjs/nekonet/src/tensor/tensor_func/basic.rs    | Rust     |         -4 |         -6 |         -4 |        -14 |
+| /Users/rikka/prjs/nekonet/src/tensor/tensor_func/compound.rs | Rust     |         -9 |         -1 |         -1 |        -11 |
+| /Users/rikka/prjs/nekonet/src/tensor/types.rs                | Rust     |          2 |          0 |         -1 |          1 |
+| Total                                                        |          |         14 |        -23 |          6 |         -3 |
++--------------------------------------------------------------+----------+------------+------------+------------+------------+

@@ -1,0 +1,13 @@
+"filename", "language", "Rust", "TOML", "Markdown", "comment", "blank", "total"
+"/Users/rikka/prjs/nekonet/Cargo.lock", "TOML", 0, -62, 0, 0, -7, -69
+"/Users/rikka/prjs/nekonet/README.md", "Markdown", 0, 0, -2, 0, 0, -2
+"/Users/rikka/prjs/nekonet/examples/mnist.rs", "Rust", 8, 0, 0, 0, 5, 13
+"/Users/rikka/prjs/nekonet/src/graph.rs", "Rust", 0, 0, 0, 1, 0, 1
+"/Users/rikka/prjs/nekonet/src/layer.rs", "Rust", 22, 0, 0, -35, -3, -16
+"/Users/rikka/prjs/nekonet/src/optimizer.rs", "Rust", 1, 0, 0, 0, 2, 3
+"/Users/rikka/prjs/nekonet/src/tensor.rs", "Rust", 54, 0, 0, 18, 15, 87
+"/Users/rikka/prjs/nekonet/src/tensor/tensor_func.rs", "Rust", 4, 0, 0, 0, 0, 4
+"/Users/rikka/prjs/nekonet/src/tensor/tensor_func/basic.rs", "Rust", -4, 0, 0, -6, -4, -14
+"/Users/rikka/prjs/nekonet/src/tensor/tensor_func/compound.rs", "Rust", -9, 0, 0, -1, -1, -11
+"/Users/rikka/prjs/nekonet/src/tensor/types.rs", "Rust", 2, 0, 0, 0, -1, 1
+"Total", "-", 78, -62, -2, -23, 6, -3

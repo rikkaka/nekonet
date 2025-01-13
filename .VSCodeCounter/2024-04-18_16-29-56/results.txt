@@ -1,0 +1,60 @@
+Date : 2024-04-18 16:29:56
+Directory : /Users/rikka/prjs/nekonet
+Total : 25 files,  2115 codes, 47 comments, 503 blanks, all 2665 lines
+
+Languages
++----------+------------+------------+------------+------------+------------+
+| language | files      | code       | comment    | blank      | total      |
++----------+------------+------------+------------+------------+------------+
+| Rust     |         23 |      1,913 |         44 |        472 |      2,429 |
+| TOML     |          2 |        202 |          3 |         31 |        236 |
++----------+------------+------------+------------+------------+------------+
+
+Directories
++--------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                         | files      | code       | comment    | blank      | total      |
++--------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                            |         25 |      2,115 |         47 |        503 |      2,665 |
+| . (Files)                                                    |          2 |        202 |          3 |         31 |        236 |
+| examples                                                     |          1 |        157 |          0 |         39 |        196 |
+| src                                                          |         17 |      1,456 |         44 |        328 |      1,828 |
+| src (Files)                                                  |          7 |        675 |         38 |        164 |        877 |
+| src/dev                                                      |          2 |         45 |          0 |          8 |         53 |
+| src/layer                                                    |          2 |         72 |          6 |         16 |         94 |
+| src/tensor                                                   |          6 |        664 |          0 |        140 |        804 |
+| src/tensor (Files)                                           |          4 |        136 |          0 |         30 |        166 |
+| src/tensor/tensor_func                                       |          2 |        528 |          0 |        110 |        638 |
+| tests                                                        |          5 |        300 |          0 |        105 |        405 |
++--------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++--------------------------------------------------------------+----------+------------+------------+------------+------------+
+| filename                                                     | language | code       | comment    | blank      | total      |
++--------------------------------------------------------------+----------+------------+------------+------------+------------+
+| /Users/rikka/prjs/nekonet/Cargo.lock                         | TOML     |        190 |          2 |         27 |        219 |
+| /Users/rikka/prjs/nekonet/Cargo.toml                         | TOML     |         12 |          1 |          4 |         17 |
+| /Users/rikka/prjs/nekonet/examples/mnist.rs                  | Rust     |        157 |          0 |         39 |        196 |
+| /Users/rikka/prjs/nekonet/src/data_util.rs                   | Rust     |         57 |          0 |         10 |         67 |
+| /Users/rikka/prjs/nekonet/src/dev/mod.rs                     | Rust     |          1 |          0 |          0 |          1 |
+| /Users/rikka/prjs/nekonet/src/dev/tensor.rs                  | Rust     |         44 |          0 |          8 |         52 |
+| /Users/rikka/prjs/nekonet/src/graph.rs                       | Rust     |         63 |          4 |         15 |         82 |
+| /Users/rikka/prjs/nekonet/src/layer.rs                       | Rust     |         66 |         12 |         17 |         95 |
+| /Users/rikka/prjs/nekonet/src/layer/activation.rs            | Rust     |         25 |          6 |          8 |         39 |
+| /Users/rikka/prjs/nekonet/src/layer/criterion.rs             | Rust     |         47 |          0 |          8 |         55 |
+| /Users/rikka/prjs/nekonet/src/lib.rs                         | Rust     |         18 |          0 |          2 |         20 |
+| /Users/rikka/prjs/nekonet/src/main.rs                        | Rust     |        127 |          0 |         33 |        160 |
+| /Users/rikka/prjs/nekonet/src/optimizer.rs                   | Rust     |         38 |          0 |         11 |         49 |
+| /Users/rikka/prjs/nekonet/src/tensor.rs                      | Rust     |        306 |         22 |         76 |        404 |
+| /Users/rikka/prjs/nekonet/src/tensor/operation.rs            | Rust     |         63 |          0 |         17 |         80 |
+| /Users/rikka/prjs/nekonet/src/tensor/tensor_func.rs          | Rust     |         52 |          0 |         10 |         62 |
+| /Users/rikka/prjs/nekonet/src/tensor/tensor_func/basic.rs    | Rust     |        420 |          0 |         85 |        505 |
+| /Users/rikka/prjs/nekonet/src/tensor/tensor_func/compound.rs | Rust     |        108 |          0 |         25 |        133 |
+| /Users/rikka/prjs/nekonet/src/tensor/types.rs                | Rust     |         10 |          0 |          2 |         12 |
+| /Users/rikka/prjs/nekonet/src/tensor/util.rs                 | Rust     |         11 |          0 |          1 |         12 |
+| /Users/rikka/prjs/nekonet/tests/test_activation.rs           | Rust     |         32 |          0 |          9 |         41 |
+| /Users/rikka/prjs/nekonet/tests/test_criterion.rs            | Rust     |         31 |          0 |         14 |         45 |
+| /Users/rikka/prjs/nekonet/tests/test_layer.rs                | Rust     |         17 |          0 |          6 |         23 |
+| /Users/rikka/prjs/nekonet/tests/test_operation.rs            | Rust     |        184 |          0 |         63 |        247 |
+| /Users/rikka/prjs/nekonet/tests/test_optimizer.rs            | Rust     |         36 |          0 |         13 |         49 |
+| Total                                                        |          |      2,115 |         47 |        503 |      2,665 |
++--------------------------------------------------------------+----------+------------+------------+------------+------------+
